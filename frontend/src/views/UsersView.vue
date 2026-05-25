@@ -92,7 +92,7 @@
                     class="text-xs font-semibold text-amber-600 hover:bg-amber-50 px-2.5 py-1.5 rounded-lg transition-colors">
                     Set pwd
                   </button>
-                  <button @click="toggleActive(u)"
+                  <button @click="confirmToggle(u)"
                     class="text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors"
                     :class="(u.active === true || u.active === 'TRUE')
                       ? 'text-red-500 hover:bg-red-50' : 'text-emerald-600 hover:bg-emerald-50'">
@@ -180,7 +180,7 @@
           </div>
 
           <div class="flex gap-3 mt-5">
-            <button @click="saveUser" :disabled="saving" class="btn-primary flex-1 justify-center">
+            <button @click="confirmSave" :disabled="saving" class="btn-primary flex-1 justify-center">
               <span v-if="saving" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
               {{ saving ? 'Saving…' : 'Save user' }}
             </button>
@@ -218,12 +218,36 @@
       </div>
     </Transition>
   </Teleport>
+
+  <!-- Toggle user confirm -->
+  <ConfirmModal
+    v-model="showToggleConfirm"
+    :title="toggleConfirmTitle"
+    :message="toggleConfirmMessage"
+    :variant="toggleConfirmVariant"
+    :confirm-label="toggleConfirmLabel"
+    :loading="togglingUser"
+    @confirm="doToggleActive"
+    @cancel="cancelToggle"
+  />
+
+  <!-- Save user confirm -->
+  <ConfirmModal
+    v-model="showSaveConfirm"
+    :title="saveConfirmTitle"
+    message="Please review the details before saving."
+    :confirm-label="saveConfirmLabel"
+    :loading="saving"
+    @confirm="doSaveUser"
+    @cancel="showSaveConfirm = false"
+  />
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { api, apiPost } from '@/services/api'
 import FormField from '@/components/ui/FormField.vue'
+import ConfirmModal from '@/components/ui/ConfirmModal.vue'
 import { MagnifyingGlassIcon, PlusIcon, XMarkIcon, ExclamationCircleIcon } from '@heroicons/vue/24/outline'
 
 const users    = ref([])
@@ -341,7 +365,59 @@ function closeForm() {
   form.value      = emptyForm()
 }
 
-async function saveUser() {
+async function doSaveUser() {
+  saving.value    = true
+  formError.value = null
+  try {
+    const action = editing.value ? 'updateUser' : 'createUser'
+    await apiPost(action, form.value)
+    users.value = await api('getUsers')
+    showSaveConfirm.value = false
+    closeForm()
+  } catch (e) {
+    formError.value = e.message
+    showSaveConfirm.value = false
+  } finally {
+    saving.value = false
+  }
+}
+
+const showToggleConfirm = ref(false)
+const toggleIsActive = computed(() => toggleTarget.value && (toggleTarget.value.active === true || toggleTarget.value.active === 'TRUE'))
+const toggleConfirmTitle   = computed(() => toggleIsActive.value ? 'Deactivate user?' : 'Activate user?')
+const toggleConfirmMessage = computed(() => toggleIsActive.value
+  ? `${toggleTarget.value?.display_name} will no longer be able to log in. Their cases remain intact.`
+  : `${toggleTarget.value?.display_name} will be able to log in again.`)
+const toggleConfirmVariant = computed(() => toggleIsActive.value ? 'danger' : 'default')
+const toggleConfirmLabel   = computed(() => toggleIsActive.value ? 'Yes, deactivate' : 'Yes, activate')
+const showSaveConfirm   = ref(false)
+const saveConfirmTitle = computed(() => editing.value ? 'Save user changes?' : 'Create new user?')
+const saveConfirmLabel = computed(() => editing.value ? 'Yes, save changes' : 'Yes, create user')
+const toggleTarget      = ref(null)
+const togglingUser      = ref(false)
+
+function cancelToggle() { showToggleConfirm.value = false; toggleTarget.value = null }
+
+function confirmToggle(u) {
+  toggleTarget.value = u
+  showToggleConfirm.value = true
+}
+
+async function doToggleActive() {
+  if (!toggleTarget.value) return
+  togglingUser.value = true
+  try {
+    const isActive = toggleTarget.value.active === true || toggleTarget.value.active === 'TRUE'
+    await apiPost('toggleUser', { email: toggleTarget.value.email, active: !isActive })
+    users.value = await api('getUsers')
+    showToggleConfirm.value = false
+    toggleTarget.value = null
+  } finally {
+    togglingUser.value = false
+  }
+}
+
+function confirmSave() {
   if (!form.value.email || !form.value.role) {
     formError.value = 'Email and role are required.'
     return
@@ -354,25 +430,8 @@ async function saveUser() {
     formError.value = 'Please enter a province for LGU Supervisor users.'
     return
   }
-  saving.value    = true
   formError.value = null
-  try {
-    const action = editing.value ? 'updateUser' : 'createUser'
-    await apiPost(action, form.value)
-    users.value = await api('getUsers')
-    closeForm()
-  } catch (e) {
-    formError.value = e.message
-  } finally {
-    saving.value = false
-  }
-}
-
-async function toggleActive(u) {
-  const isActive = u.active === true || u.active === 'TRUE'
-  if (!confirm(`${isActive ? 'Deactivate' : 'Activate'} ${u.display_name}?`)) return
-  await apiPost('toggleUser', { email: u.email, active: !isActive })
-  users.value = await api('getUsers')
+  showSaveConfirm.value = true
 }
 
 function setPassword(u) {
