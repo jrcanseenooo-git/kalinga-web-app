@@ -15,3 +15,11 @@ Thumbs.db
 .vscode/
 .idea/
 *.log
+
+# Vercel
+frontend/.vercel/
+.vercel/
+
+# Apps Script — never commit real IDs
+# (SPREADSHEET_ID is set directly in Apps Script editor)
+appscript/*.gs.local
