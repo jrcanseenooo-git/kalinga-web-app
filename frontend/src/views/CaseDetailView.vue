@@ -22,11 +22,11 @@
           <RouterLink :to="`/cases/${caseData.case_id}/edit`" class="btn-primary text-xs py-2">
             <PencilIcon class="w-3.5 h-3.5" /> Edit Case
           </RouterLink>
-          <button v-if="caseData.status === 'active'" @click="closeCase"
+          <button v-if="caseData.status === 'active'" @click="showCloseConfirm = true"
             class="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 transition-colors font-semibold">
             <XMarkIcon class="w-3.5 h-3.5" /> Close
           </button>
-          <button v-if="caseData.status === 'closed'" @click="reopenCase"
+          <button v-if="caseData.status === 'closed'" @click="showReopenConfirm = true"
             class="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl border border-emerald-200 text-emerald-600 hover:bg-emerald-50 transition-colors font-semibold">
             <ArrowPathIcon class="w-3.5 h-3.5" /> Reopen
           </button>
@@ -208,10 +208,10 @@
                     class="text-red-400">*</span></label>
                 <select v-model="noteForm.note_type" class="input-base text-sm">
                   <option value="">— Select type —</option>
-                  <option value="progress">Progress Note</option>
-                  <option value="referral">MDT Referral / Transfer</option>
-                  <option value="follow_up">Follow-up</option>
-                  <option value="closure">Closure Note</option>
+                  <option value="progress">📝 Progress Note</option>
+                  <option value="referral">🔀 MDT Referral / Transfer</option>
+                  <option value="follow_up">🔔 Follow-up</option>
+                  <option value="closure">✅ Closure Note</option>
                 </select>
               </div>
               <!-- Date -->
@@ -305,7 +305,7 @@
             </div>
 
             <div class="flex gap-3 pt-1">
-              <button @click="submitNote" :disabled="savingNote" class="btn-primary text-sm">
+              <button @click="confirmNote" :disabled="savingNote" class="btn-primary text-sm">
                 <span v-if="savingNote"
                   class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                 {{ savingNote ? 'Saving…' : editingNoteId ? 'Update entry' : 'Save entry' }}
@@ -444,7 +444,7 @@
           <FormField label="Amount (₱)" v-model="svcForm.amount" type="number" />
           <FormField label="Date provided" v-model="svcForm.date_provided" type="date" />
           <div class="flex gap-3 pt-2">
-            <button @click="submitService" :disabled="savingSvc" class="btn-primary flex-1 justify-center">
+            <button @click="confirmService" :disabled="savingSvc" class="btn-primary flex-1 justify-center">
               <span v-if="savingSvc"
                 class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
               {{ savingSvc ? 'Saving…' : 'Add service' }}
@@ -455,6 +455,55 @@
       </div>
     </Transition>
   </Teleport>
+  <!-- Close case confirm -->
+  <ConfirmModal
+    v-model="showCloseConfirm"
+    title="Close this case?"
+    message="Closing this case means all interventions are complete or resolved. The case will remain in the registry and can be reopened later."
+    variant="warning"
+    confirm-label="Yes, close case"
+    icon="trash"
+    :loading="actionLoading"
+    @confirm="doCloseCase"
+    @cancel="showCloseConfirm = false"
+  />
+
+  <!-- Reopen case confirm -->
+  <ConfirmModal
+    v-model="showReopenConfirm"
+    title="Reopen this case?"
+    message="This will set the case back to active status and allow new interventions and updates."
+    variant="default"
+    confirm-label="Yes, reopen case"
+    icon="reopen"
+    :loading="actionLoading"
+    @confirm="doReopenCase"
+    @cancel="showReopenConfirm = false"
+  />
+
+  <!-- Add note confirm -->
+  <ConfirmModal
+    v-model="showNoteConfirm"
+    :title="editingNoteId ? 'Update this note?' : 'Save progress note?'"
+    :message="editingNoteId
+      ? 'You are about to update this case note. Changes will be saved permanently.'
+      : 'You are about to add a new entry to the case timeline. Please ensure the information is accurate.'"
+    confirm-label="Yes, save"
+    :loading="savingNote"
+    @confirm="doSubmitNote"
+    @cancel="showNoteConfirm = false"
+  />
+
+  <!-- Add service confirm -->
+  <ConfirmModal
+    v-model="showServiceConfirm"
+    title="Add service record?"
+    message="You are about to record a service provided to this client. This will be reflected in the case history and reports."
+    confirm-label="Yes, add service"
+    :loading="savingSvc"
+    @confirm="doSubmitService"
+    @cancel="showServiceConfirm = false"
+  />
 </template>
 
 <script setup>
@@ -465,6 +514,7 @@ import { api, apiPost } from '@/services/api'
 import FormField from '@/components/ui/FormField.vue'
 import SelectField from '@/components/ui/SelectField.vue'
 import InfoItem from '@/components/ui/InfoItem.vue'
+import ConfirmModal from '@/components/ui/ConfirmModal.vue'
 import AssessmentItem from '@/components/ui/AssessmentItem.vue'
 import {
   PencilIcon, PrinterIcon, ChevronLeftIcon, XMarkIcon,
@@ -565,32 +615,62 @@ function noteTypeStyle(type) {
 
 function printCase() { window.print() }
 
-async function closeCase() {
-  if (!confirm('Are you sure you want to close this case?')) return
-  await apiPost('closeCase', { case_id: route.params.id })
-  caseData.value.status = 'closed'
-  caseData.value.date_closed = new Date().toISOString()
+// Confirm state
+const showCloseConfirm  = ref(false)
+const showReopenConfirm = ref(false)
+const showNoteConfirm   = ref(false)
+const showServiceConfirm= ref(false)
+const actionLoading     = ref(false)
+
+async function doCloseCase() {
+  actionLoading.value = true
+  try {
+    await apiPost('closeCase', { case_id: route.params.id })
+    caseData.value.status = 'closed'
+    caseData.value.date_closed = new Date().toISOString()
+    showCloseConfirm.value = false
+  } finally {
+    actionLoading.value = false
+  }
 }
 
-async function reopenCase() {
-  if (!confirm('Reopen this case?')) return
-  await apiPost('reopenCase', { case_id: route.params.id })
-  caseData.value.status = 'active'
-  caseData.value.date_closed = ''
+async function doReopenCase() {
+  actionLoading.value = true
+  try {
+    await apiPost('reopenCase', { case_id: route.params.id })
+    caseData.value.status = 'active'
+    caseData.value.date_closed = ''
+    showReopenConfirm.value = false
+  } finally {
+    actionLoading.value = false
+  }
 }
 
-async function submitService() {
+function confirmService() {
+  if (!svcForm.value.service_type) return
+  showServiceConfirm.value = true
+}
+
+async function doSubmitService() {
   if (!svcForm.value.service_type) return
   savingSvc.value = true
   try {
     await apiPost('addService', { case_id: route.params.id, ...svcForm.value })
     caseData.value = await api('getCase', { case_id: route.params.id })
+    showServiceConfirm.value = false
     showServiceForm.value = false
     svcForm.value = { service_type: '', amount: '', date_provided: '' }
   } finally { savingSvc.value = false }
 }
 
-async function submitNote() {
+function confirmNote() {
+  noteError.value = null
+  if (!noteForm.value.note_type) { noteError.value = 'Please select a note type.'; return }
+  if (!noteForm.value.content)   { noteError.value = 'Please enter a note or update.'; return }
+  showNoteConfirm.value = true
+}
+
+async function doSubmitNote() {
   noteError.value = null
   if (!noteForm.value.note_type) { noteError.value = 'Please select a note type.'; return }
   if (!noteForm.value.content) { noteError.value = 'Please enter a note or update.'; return }
@@ -614,10 +694,12 @@ async function submitNote() {
       await apiPost('addNote', payload)
     }
     caseData.value = await api('getCase', { case_id: route.params.id })
+    showNoteConfirm.value = false
     showNoteForm.value = false
     resetNoteForm()
   } catch (e) {
     noteError.value = e.message
+    showNoteConfirm.value = false
   } finally {
     savingNote.value = false
   }
