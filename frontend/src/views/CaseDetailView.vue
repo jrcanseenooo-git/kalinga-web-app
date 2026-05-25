@@ -3,8 +3,38 @@
 
     <!-- Loading -->
     <div v-if="loading" class="space-y-4">
-      <div class="card p-6 h-40 animate-pulse-soft bg-gray-50"></div>
-      <div class="card p-6 h-32 animate-pulse-soft bg-gray-50"></div>
+      <!-- Header skeleton -->
+      <div class="card p-6">
+        <div class="flex items-start gap-4">
+          <div class="w-14 h-14 rounded-2xl bg-gray-100 animate-pulse flex-shrink-0"></div>
+          <div class="flex-1 space-y-2">
+            <div class="h-5 bg-gray-100 rounded-lg animate-pulse w-48"></div>
+            <div class="h-3 bg-gray-100 rounded-lg animate-pulse w-32"></div>
+            <div class="h-3 bg-gray-100 rounded-lg animate-pulse w-24"></div>
+          </div>
+        </div>
+        <div class="mt-6 space-y-3">
+          <div class="h-3 bg-gray-100 rounded-lg animate-pulse w-full"></div>
+          <div class="h-3 bg-gray-100 rounded-lg animate-pulse w-4/5"></div>
+          <div class="h-3 bg-gray-100 rounded-lg animate-pulse w-3/5"></div>
+        </div>
+      </div>
+      <!-- Cards skeleton -->
+      <div class="card p-6 space-y-3">
+        <div class="h-4 bg-gray-100 rounded-lg animate-pulse w-32"></div>
+        <div class="grid grid-cols-3 gap-4">
+          <div v-for="i in 6" :key="i" class="h-10 bg-gray-100 rounded-lg animate-pulse"></div>
+        </div>
+      </div>
+      <div class="card p-6 space-y-3">
+        <div class="h-4 bg-gray-100 rounded-lg animate-pulse w-24"></div>
+        <div class="h-20 bg-gray-100 rounded-xl animate-pulse"></div>
+      </div>
+      <!-- Loading message -->
+      <div class="flex items-center justify-center gap-2 py-4 text-gray-400">
+        <div class="w-4 h-4 border-2 border-gray-300 border-t-brand-500 rounded-full animate-spin"></div>
+        <p class="text-xs font-medium">Loading case details…</p>
+      </div>
     </div>
 
     <template v-else-if="caseData">
@@ -98,7 +128,7 @@
                 <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Present address</p>
                 <p class="text-sm text-gray-700">
                   {{[caseData.present_street, caseData.barangay, caseData.city_muni, caseData.province,
-                  caseData.region].filter(v => v && String(v).trim()).join(', ') || '—' }}
+                  caseData.region].filter(v => v && String(v).trim()).join(', ') || '—'}}
                 </p>
               </div>
               <div class="bg-gray-50 rounded-xl p-4">
@@ -107,7 +137,7 @@
                   {{[caseData.per_street, caseData.per_barangay, caseData.per_city_muni, caseData.per_province,
                   caseData.per_region].filter(v => v && String(v).trim()).join(', ') ||
                     [caseData.prov_street, caseData.prov_barangay, caseData.prov_city_muni, caseData.prov_province,
-                    caseData.prov_region].filter(v => v && String(v).trim()).join(', ') || '—' }}
+                    caseData.prov_region].filter(v => v && String(v).trim()).join(', ') || '—'}}
                 </p>
               </div>
             </div>
@@ -456,54 +486,28 @@
     </Transition>
   </Teleport>
   <!-- Close case confirm -->
-  <ConfirmModal
-    v-model="showCloseConfirm"
-    title="Close this case?"
+  <ConfirmModal v-model="showCloseConfirm" title="Close this case?"
     message="Closing this case means all interventions are complete or resolved. The case will remain in the registry and can be reopened later."
-    variant="warning"
-    confirm-label="Yes, close case"
-    icon="trash"
-    :loading="actionLoading"
-    @confirm="doCloseCase"
-    @cancel="showCloseConfirm = false"
-  />
+    variant="warning" confirm-label="Yes, close case" icon="trash" :loading="actionLoading" @confirm="doCloseCase"
+    @cancel="showCloseConfirm = false" />
 
   <!-- Reopen case confirm -->
-  <ConfirmModal
-    v-model="showReopenConfirm"
-    title="Reopen this case?"
-    message="This will set the case back to active status and allow new interventions and updates."
-    variant="default"
-    confirm-label="Yes, reopen case"
-    icon="reopen"
-    :loading="actionLoading"
-    @confirm="doReopenCase"
-    @cancel="showReopenConfirm = false"
-  />
+  <ConfirmModal v-model="showReopenConfirm" title="Reopen this case?"
+    message="This will set the case back to active status and allow new interventions and updates." variant="default"
+    confirm-label="Yes, reopen case" icon="reopen" :loading="actionLoading" @confirm="doReopenCase"
+    @cancel="showReopenConfirm = false" />
 
   <!-- Add note confirm -->
-  <ConfirmModal
-    v-model="showNoteConfirm"
-    :title="editingNoteId ? 'Update this note?' : 'Save progress note?'"
-    :message="editingNoteId
-      ? 'You are about to update this case note. Changes will be saved permanently.'
-      : 'You are about to add a new entry to the case timeline. Please ensure the information is accurate.'"
-    confirm-label="Yes, save"
-    :loading="savingNote"
-    @confirm="doSubmitNote"
-    @cancel="showNoteConfirm = false"
-  />
+  <ConfirmModal v-model="showNoteConfirm" :title="editingNoteId ? 'Update this note?' : 'Save progress note?'" :message="editingNoteId
+    ? 'You are about to update this case note. Changes will be saved permanently.'
+    : 'You are about to add a new entry to the case timeline. Please ensure the information is accurate.'"
+    confirm-label="Yes, save" :loading="savingNote" @confirm="doSubmitNote" @cancel="showNoteConfirm = false" />
 
   <!-- Add service confirm -->
-  <ConfirmModal
-    v-model="showServiceConfirm"
-    title="Add service record?"
+  <ConfirmModal v-model="showServiceConfirm" title="Add service record?"
     message="You are about to record a service provided to this client. This will be reflected in the case history and reports."
-    confirm-label="Yes, add service"
-    :loading="savingSvc"
-    @confirm="doSubmitService"
-    @cancel="showServiceConfirm = false"
-  />
+    confirm-label="Yes, add service" :loading="savingSvc" @confirm="doSubmitService"
+    @cancel="showServiceConfirm = false" />
 </template>
 
 <script setup>
@@ -616,11 +620,11 @@ function noteTypeStyle(type) {
 function printCase() { window.print() }
 
 // Confirm state
-const showCloseConfirm  = ref(false)
+const showCloseConfirm = ref(false)
 const showReopenConfirm = ref(false)
-const showNoteConfirm   = ref(false)
-const showServiceConfirm= ref(false)
-const actionLoading     = ref(false)
+const showNoteConfirm = ref(false)
+const showServiceConfirm = ref(false)
+const actionLoading = ref(false)
 
 async function doCloseCase() {
   actionLoading.value = true
@@ -666,7 +670,7 @@ async function doSubmitService() {
 function confirmNote() {
   noteError.value = null
   if (!noteForm.value.note_type) { noteError.value = 'Please select a note type.'; return }
-  if (!noteForm.value.content)   { noteError.value = 'Please enter a note or update.'; return }
+  if (!noteForm.value.content) { noteError.value = 'Please enter a note or update.'; return }
   showNoteConfirm.value = true
 }
 
