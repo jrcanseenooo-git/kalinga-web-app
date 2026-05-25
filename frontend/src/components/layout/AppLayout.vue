@@ -139,6 +139,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import {
   Squares2X2Icon,
+  ChartBarIcon,
+  QuestionMarkCircleIcon,
   FolderOpenIcon,
   PlusCircleIcon,
   ArrowRightOnRectangleIcon,
@@ -173,6 +175,7 @@ const navItems = computed(() => {
   const items = [
     { to: '/dashboard', label: 'Dashboard', icon: Squares2X2Icon },
     { to: '/cases', label: 'Case Registry', icon: FolderOpenIcon },
+    { to: '/reports', label: 'Reports', icon: ChartBarIcon },
   ]
   if (auth.isAdmin) {
     items.push({ to: '/users', label: 'User Management', icon: UsersIcon })
@@ -186,6 +189,8 @@ const pageTitle = computed(() => {
     '/cases': 'Case Registry',
     '/cases/new': 'New Case',
     '/users': 'User Management',
+    '/reports': 'Reports & Export',
+    '/faq': 'Help & FAQ',
   }
   if (route.path.includes('/cases/') && route.path.includes('/edit')) return 'Edit Case'
   if (route.path.includes('/cases/') && !route.path.includes('/new')) return 'Case Details'
@@ -194,11 +199,11 @@ const pageTitle = computed(() => {
 
 const roleBadge = computed(() => {
   const map = {
-    admin:          { label: 'System Admin',    class: 'bg-purple-100 text-purple-700' },
-    case_worker:    { label: 'Case Worker',     class: 'bg-blue-100 text-blue-700' },
-    fo_user:        { label: 'Field Office',    class: 'bg-indigo-100 text-indigo-700' },
-    lgu_supervisor: { label: 'LGU Supervisor',  class: 'bg-amber-100 text-amber-700' },
-    cpu_monitor:    { label: 'CPU Monitor',     class: 'bg-green-100 text-green-700' },
+    admin: { label: 'System Admin', class: 'bg-purple-100 text-purple-700' },
+    case_worker: { label: 'Case Worker', class: 'bg-blue-100 text-blue-700' },
+    fo_user: { label: 'Field Office', class: 'bg-indigo-100 text-indigo-700' },
+    lgu_supervisor: { label: 'LGU Supervisor', class: 'bg-amber-100 text-amber-700' },
+    cpu_monitor: { label: 'CPU Monitor', class: 'bg-green-100 text-green-700' },
   }
   return map[auth.role] || { label: auth.role, class: 'bg-gray-100 text-gray-600' }
 })
