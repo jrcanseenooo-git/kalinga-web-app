@@ -111,7 +111,13 @@
             Clear
           </button>
         </div>
-        
+
+        <!-- Subtle spinner while re-fetching filtered data -->
+        <svg v-if="filtering" class="w-4 h-4 animate-spin text-brand-400 ml-1 flex-shrink-0" fill="none"
+          viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+        </svg>
       </div>
     </div>
 
@@ -254,7 +260,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { Bar, Doughnut } from 'vue-chartjs'
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement,
@@ -270,9 +276,12 @@ import {
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend)
 
 const loading = ref(true)
+const filtering = ref(false)   // subtle loading indicator when filters change
 const stats = ref(null)
-const lastUpdatedAt = ref(null)   // timestamp of last successful fetch
+const allCefmuTypes = ref([])  // stable list from unfiltered data for the dropdown
+const lastUpdatedAt = ref(null)
 let pollTimer = null
+let labelTimer = null
 
 // ── Filters ──────────────────────────────────────────────────
 const filterStatus = ref('all')
@@ -286,12 +295,21 @@ const hasActiveFilters = computed(() =>
 const activeFilterCount = computed(() =>
   [filterStatus, filterClass, filterSex, filterCefmuType].filter(f => f.value !== 'all').length
 )
-const cefmuTypeOptions = computed(() =>
-  stats.value ? Object.keys(stats.value.byCefmuType || {}).filter(k => k && k !== 'Unknown') : []
-)
+// Always show the full CEFMU type list (from unfiltered data) so the dropdown is stable
+const cefmuTypeOptions = computed(() => allCefmuTypes.value)
 
 function clearFilters() {
   filterStatus.value = filterClass.value = filterSex.value = filterCefmuType.value = 'all'
+}
+
+// ── Build API params from current filters ─────────────────────
+function filterParams() {
+  const p = {}
+  if (filterStatus.value !== 'all') p.status = filterStatus.value
+  if (filterClass.value !== 'all') p.classification = filterClass.value
+  if (filterSex.value !== 'all') p.sex = filterSex.value
+  if (filterCefmuType.value !== 'all') p.cefmu_type = filterCefmuType.value
+  return p
 }
 
 // ── Last-updated label ────────────────────────────────────────
@@ -305,50 +323,61 @@ const lastUpdatedLabel = computed(() => {
   return `${Math.floor(mins / 60)}h ago`
 })
 
-// Tick label every 15 s so "2m ago" doesn't freeze
-let labelTimer = null
-
-// ── Data loading (stale-while-revalidate) ────────────────────
-async function loadData() {
+// ── Data loading ──────────────────────────────────────────────
+async function loadData(params = {}, opts = {}) {
   try {
-    const data = await api('getPublicDashboard', {}, {
+    const data = await api('getPublicDashboard', params, opts)
+    if (data) {
+      stats.value = data
+      lastUpdatedAt.value = Date.now()
+      // Preserve the full CEFMU type list from the unfiltered response
+      if (data.allCefmuTypes) {
+        allCefmuTypes.value = Object.keys(data.allCefmuTypes).filter(k => k && k !== 'Unknown')
+      } else if (!allCefmuTypes.value.length) {
+        allCefmuTypes.value = Object.keys(data.byCefmuType || {}).filter(k => k && k !== 'Unknown')
+      }
+    }
+  } catch (e) {
+    console.error('Public dashboard load error:', e)
+  }
+}
+
+// ── Watch filters → re-fetch with params ─────────────────────
+watch([filterStatus, filterClass, filterSex, filterCefmuType], async () => {
+  filtering.value = true
+  await loadData(filterParams(), {
+    skipCache: false,
+    revalidate(fresh) {
+      stats.value = fresh
+      lastUpdatedAt.value = Date.now()
+    }
+  })
+  filtering.value = false
+})
+
+// ── Polling — re-fetch every 5 minutes ───────────────────────
+function startPolling() {
+  pollTimer = setInterval(() => {
+    loadData(filterParams(), {
+      skipCache: true,
       revalidate(fresh) {
         stats.value = fresh
         lastUpdatedAt.value = Date.now()
       }
     })
-    if (data) {
-      stats.value = data
-      lastUpdatedAt.value = Date.now()
-    }
-  } catch (e) {
-    console.error('Public dashboard load error:', e)
-  } finally {
-    loading.value = false
-  }
-}
-
-// ── Polling — re-fetch every 5 minutes ───────────────────────
-function startPolling() {
-  pollTimer = setInterval(() => {
-    api('getPublicDashboard', {}, {
-      skipCache: true,          // bypass cache on poll — we WANT fresh data
-      revalidate(fresh) {
-        stats.value = fresh
-        lastUpdatedAt.value = Date.now()
-      }
-    }).then(fresh => {
-      stats.value = fresh
-      lastUpdatedAt.value = Date.now()
-    }).catch(() => { })
   }, 5 * 60 * 1000)
 }
 
 onMounted(async () => {
   window.scrollTo({ top: 0, behavior: 'instant' })
-  await loadData()
+  await loadData({}, {
+    revalidate(fresh) {
+      stats.value = fresh
+      lastUpdatedAt.value = Date.now()
+    }
+  })
+  loading.value = false
   startPolling()
-  // Refresh the "X ago" label every 15 s
   labelTimer = setInterval(() => { lastUpdatedAt.value = lastUpdatedAt.value }, 15_000)
 })
 
@@ -391,14 +420,7 @@ const trendData = computed(() => stats.value?.trend?.length ? {
 const classData = computed(() => stats.value ? obj2chart(stats.value.byClassification, PURPLE) : null)
 const sexData = computed(() => stats.value ? obj2chart(stats.value.bySex, BLUES) : null)
 const ageData = computed(() => stats.value ? obj2chart(stats.value.ageBands, PURPLE) : null)
-const cefmuData = computed(() => {
-  if (!stats.value) return null
-  let data = stats.value.byCefmuType || {}
-  if (filterCefmuType.value !== 'all') {
-    data = Object.fromEntries(Object.entries(data).filter(([k]) => k === filterCefmuType.value))
-  }
-  return obj2chart(data, PURPLE)
-})
+const cefmuData = computed(() => stats.value ? obj2chart(stats.value.byCefmuType, PURPLE) : null)
 
 const tickFont = { family: 'Plus Jakarta Sans', size: 10 }
 
