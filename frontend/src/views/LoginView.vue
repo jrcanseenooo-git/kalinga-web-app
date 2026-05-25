@@ -6,11 +6,11 @@
       style="height:100vh;width:480px;min-width:480px;">
 
       <!-- Logo -->
-      <div class="mb-10">
+      <!-- <div class="mb-10">
         <div class="flex items-center gap-3 mb-1">
           <img src="/logo-purple.png" alt="Kalinga" class="h-12 w-auto" />
         </div>
-      </div>
+      </div> -->
 
       <!-- Heading -->
       <div class="mb-8">
