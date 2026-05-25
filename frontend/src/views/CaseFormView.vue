@@ -257,7 +257,7 @@
         </div>
 
         <div class="flex gap-3 pt-2 border-t">
-          <button type="submit" :disabled="saving"
+          <button type="button" @click.prevent="confirmSubmit" :disabled="saving"
             class="bg-brand-600 text-white text-sm px-5 py-2 rounded-lg hover:bg-brand-700 transition-colors disabled:opacity-50 flex items-center gap-2">
             <span v-if="saving"
               class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
@@ -271,6 +271,17 @@
       </form>
     </div>
   </div>
+
+  <!-- Confirm submit modal -->
+  <ConfirmModal
+    v-model="showConfirm"
+    :title="confirmTitle"
+    :message="confirmMessage"
+    :confirm-label="confirmLabel"
+    :loading="saving"
+    @confirm="doSubmit"
+    @cancel="showConfirm = false"
+  />
 </template>
 
 <script setup>
@@ -279,6 +290,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { api, apiPost } from '@/services/api'
 import FormField from '@/components/ui/FormField.vue'
 import SelectField from '@/components/ui/SelectField.vue'
+import ConfirmModal from '@/components/ui/ConfirmModal.vue'
 import {
   regions as regionList, provinces as provincesMap,
   civilStatuses, religions, educLevels, ipCategories,
@@ -497,7 +509,36 @@ watch(() => route.path, (path) => {
 })
 
 // ─── Submit ───────────────────────────────────────────────────
-async function submit() {
+const showConfirm = ref(false)
+const confirmTitle   = computed(() => isEdit.value ? 'Save changes?' : 'Create new case?')
+const confirmMessage = computed(() => isEdit.value
+  ? 'Save changes to this case record. Ensure all information is accurate before saving.'
+  : 'Create a new CEFMU case record. Ensure all required fields are filled in correctly.')
+const confirmLabel   = computed(() => isEdit.value ? 'Yes, save changes' : 'Yes, create case')
+
+function confirmSubmit() {
+  // Basic validation before showing confirm
+  if (!form.value.client_last || !form.value.client_first) {
+    error.value = "Please enter the client last name and first name."
+    return
+  }
+  if (!form.value.date_intake) {
+    error.value = 'Please fill in the date of intake.'
+    return
+  }
+  if (!form.value.region) {
+    error.value = 'Please select a region.'
+    return
+  }
+  if (!form.value.classification) {
+    error.value = 'Please select a classification.'
+    return
+  }
+  error.value = null
+  showConfirm.value = true
+}
+
+async function doSubmit() {
   saving.value = true
   error.value = null
   try {
