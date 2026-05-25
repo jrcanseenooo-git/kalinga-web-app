@@ -1,12 +1,3 @@
-// ============================================================
-// Cases.gs — CRUD for cases, services, progress notes
-// Definitive fix:
-//   1. Dynamic header matching (column order irrelevant)
-//   2. family_members stored in JSON column + dedicated sheet
-//   3. _saveFamilyMembers matches actual setupFamilySheet columns
-//   4. family_members param handled as array OR string
-// ============================================================
-
 const CASE_SHEET   = 'cases';
 const FAMILY_SHEET = 'family_members';
 
@@ -21,6 +12,19 @@ const FAMILY_COLS = [
 
 function _getSheet(name) {
   return SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(name);
+}
+
+function _sheetToObjectsSS(ss, name) {
+  const sheet = ss.getSheetByName(name);
+  if (!sheet) return [];
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return [];
+  const headers = data[0];
+  return data.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = (row[i] === null || row[i] === undefined) ? '' : row[i]; });
+    return obj;
+  });
 }
 
 function _sheetToObjects(sheet) {
@@ -128,8 +132,9 @@ function getCases(e, user) {
 
 // ── getCase ──────────────────────────────────────────────────
 function getCase(e, user) {
-  const id    = e.parameter.case_id;
-  const cases = _sheetToObjects(_getSheet(CASE_SHEET));
+  const id = e.parameter.case_id;
+  const ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const cases = _sheetToObjectsSS(ss, CASE_SHEET);
   const found = cases.find(c => c.case_id === id);
   if (!found) return _error('Case not found', 404);
 
