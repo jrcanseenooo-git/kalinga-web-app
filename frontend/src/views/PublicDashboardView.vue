@@ -37,6 +37,12 @@
                 complete national picture. No personally identifiable information is displayed.</span>
             </div>
           </div>
+          <!-- FAQ CTA — visible to new visitors right in the hero -->
+          <RouterLink to="/faq"
+            class="flex-shrink-0 flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/25 hover:border-white/50 text-white rounded-xl px-4 py-2.5 text-sm font-semibold transition-all backdrop-blur-sm">
+            <QuestionMarkCircleIcon class="w-4 h-4" />
+            Help &amp; FAQ
+          </RouterLink>
         </div>
       </div>
     </div>
@@ -105,10 +111,7 @@
             Clear
           </button>
         </div>
-
-        <span v-if="hasActiveFilters" class="text-xs bg-brand-600 text-white font-bold px-2.5 py-1 rounded-full">
-          {{ activeFilterCount }}
-        </span>
+        
       </div>
     </div>
 
@@ -232,7 +235,8 @@
               <span class="text-xs text-gray-400">Updated {{ lastUpdatedLabel }}</span>
             </div>
             <RouterLink to="/faq"
-              class="w-full text-center text-xs font-semibold text-gray-500 hover:text-brand-600 border border-gray-200 px-4 py-2 rounded-xl transition-colors hover:border-brand-300">
+              class="flex items-center gap-1.5 text-xs font-semibold text-brand-600 hover:text-brand-800 border border-brand-200 hover:border-brand-400 bg-brand-50 hover:bg-brand-100 px-4 py-2 rounded-xl transition-colors">
+              <QuestionMarkCircleIcon class="w-3.5 h-3.5" />
               Help & FAQ
             </RouterLink>
           </div>
@@ -260,7 +264,7 @@ import { api } from '@/services/api'
 import PhilippineHeatmap from '@/components/ui/PhilippineHeatmap.vue'
 import {
   InformationCircleIcon, XMarkIcon, ChevronDownIcon,
-  FolderOpenIcon, ClockIcon, CheckCircleIcon
+  FolderOpenIcon, ClockIcon, CheckCircleIcon, QuestionMarkCircleIcon
 } from '@heroicons/vue/24/outline'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend)
