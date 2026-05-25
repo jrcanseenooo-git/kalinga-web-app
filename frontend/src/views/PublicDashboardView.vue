@@ -225,13 +225,15 @@
           <div class="flex items-center gap-4">
             <div class="flex items-center gap-1.5">
               <span class="relative flex h-2 w-2">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span
+                  class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
               <span class="text-xs text-gray-400">Updated {{ lastUpdatedLabel }}</span>
             </div>
-            <RouterLink to="/login" class="text-xs text-brand-600 hover:underline font-semibold">
-              Staff login →
+            <RouterLink to="/faq"
+              class="w-full text-center text-xs font-semibold text-gray-500 hover:text-brand-600 border border-gray-200 px-4 py-2 rounded-xl transition-colors hover:border-brand-300">
+              Help & FAQ
             </RouterLink>
           </div>
         </div>
@@ -263,15 +265,15 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend)
 
-const loading       = ref(true)
-const stats         = ref(null)
+const loading = ref(true)
+const stats = ref(null)
 const lastUpdatedAt = ref(null)   // timestamp of last successful fetch
-let   pollTimer     = null
+let pollTimer = null
 
 // ── Filters ──────────────────────────────────────────────────
-const filterStatus    = ref('all')
-const filterClass     = ref('all')
-const filterSex       = ref('all')
+const filterStatus = ref('all')
+const filterClass = ref('all')
+const filterSex = ref('all')
 const filterCefmuType = ref('all')
 
 const hasActiveFilters = computed(() =>
@@ -292,10 +294,10 @@ function clearFilters() {
 const lastUpdatedLabel = computed(() => {
   if (!lastUpdatedAt.value) return '—'
   const secs = Math.floor((Date.now() - lastUpdatedAt.value) / 1000)
-  if (secs < 10)  return 'just now'
-  if (secs < 60)  return `${secs}s ago`
+  if (secs < 10) return 'just now'
+  if (secs < 60) return `${secs}s ago`
   const mins = Math.floor(secs / 60)
-  if (mins < 60)  return `${mins}m ago`
+  if (mins < 60) return `${mins}m ago`
   return `${Math.floor(mins / 60)}h ago`
 })
 
@@ -307,12 +309,12 @@ async function loadData() {
   try {
     const data = await api('getPublicDashboard', {}, {
       revalidate(fresh) {
-        stats.value        = fresh
+        stats.value = fresh
         lastUpdatedAt.value = Date.now()
       }
     })
     if (data) {
-      stats.value         = data
+      stats.value = data
       lastUpdatedAt.value = Date.now()
     }
   } catch (e) {
@@ -328,13 +330,13 @@ function startPolling() {
     api('getPublicDashboard', {}, {
       skipCache: true,          // bypass cache on poll — we WANT fresh data
       revalidate(fresh) {
-        stats.value         = fresh
+        stats.value = fresh
         lastUpdatedAt.value = Date.now()
       }
     }).then(fresh => {
-      stats.value         = fresh
+      stats.value = fresh
       lastUpdatedAt.value = Date.now()
-    }).catch(() => {})
+    }).catch(() => { })
   }, 5 * 60 * 1000)
 }
 
@@ -353,12 +355,12 @@ onUnmounted(() => {
 
 // ── Chart helpers ─────────────────────────────────────────────
 const PURPLE = ['#8D5FCC', '#9a7de8', '#6b4aab', '#b89ce0', '#5a3a95', '#c4b5e3', '#7c5cbf']
-const BLUES  = ['#3b82f6', '#60a5fa', '#2563eb', '#93c5fd']
+const BLUES = ['#3b82f6', '#60a5fa', '#2563eb', '#93c5fd']
 
 const baseTooltip = {
   backgroundColor: '#1e0b4b',
   titleFont: { family: 'Plus Jakarta Sans', size: 11 },
-  bodyFont:  { family: 'Plus Jakarta Sans', size: 11 },
+  bodyFont: { family: 'Plus Jakarta Sans', size: 11 },
   padding: 10, cornerRadius: 8, displayColors: false,
 }
 
@@ -367,7 +369,7 @@ function obj2chart(obj, colors) {
   const entries = Object.entries(obj).filter(([k, v]) => v > 0 && k && k !== 'Unknown')
   if (!entries.length) return null
   return {
-    labels:   entries.map(([k]) => k),
+    labels: entries.map(([k]) => k),
     datasets: [{ data: entries.map(([, v]) => v), backgroundColor: colors }]
   }
 }
@@ -383,8 +385,8 @@ const trendData = computed(() => stats.value?.trend?.length ? {
 } : null)
 
 const classData = computed(() => stats.value ? obj2chart(stats.value.byClassification, PURPLE) : null)
-const sexData   = computed(() => stats.value ? obj2chart(stats.value.bySex, BLUES) : null)
-const ageData   = computed(() => stats.value ? obj2chart(stats.value.ageBands, PURPLE) : null)
+const sexData = computed(() => stats.value ? obj2chart(stats.value.bySex, BLUES) : null)
+const ageData = computed(() => stats.value ? obj2chart(stats.value.ageBands, PURPLE) : null)
 const cefmuData = computed(() => {
   if (!stats.value) return null
   let data = stats.value.byCefmuType || {}
