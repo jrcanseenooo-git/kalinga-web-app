@@ -49,13 +49,6 @@
 
     <!-- ── FILTER BAR ── -->
     <div class="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-20">
-      <!-- Full-width animated progress bar — shown while fetching filtered data -->
-      <div class="h-0.5 w-full overflow-hidden" :class="filtering ? 'bg-gray-100' : 'bg-transparent'">
-        <div v-if="filtering"
-          class="progress-bar h-full bg-brand-500 rounded-full"
-        ></div>
-      </div>
-
       <div class="max-w-7xl mx-auto px-6 py-2.5 flex items-center gap-2 flex-wrap">
         <span class="text-xs font-bold text-gray-400 uppercase tracking-wider mr-1">Filter</span>
 
@@ -118,7 +111,6 @@
             Clear
           </button>
         </div>
-        
       </div>
     </div>
 
@@ -135,22 +127,7 @@
 
     <!-- ── MAIN CONTENT ── -->
     <template v-else-if="stats">
-      <!-- Overlay while filter re-fetch is in flight -->
-      <div class="relative">
-        <Transition name="fade">
-          <div v-if="filtering"
-            class="absolute inset-0 z-10 bg-white/60 backdrop-blur-[1px] flex items-start justify-center pt-24 pointer-events-none">
-            <div class="flex items-center gap-3 bg-white border border-brand-100 shadow-lg rounded-2xl px-5 py-3">
-              <svg class="w-4 h-4 animate-spin text-brand-500" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-              </svg>
-              <span class="text-sm font-semibold text-brand-700">Updating dashboard…</span>
-            </div>
-          </div>
-        </Transition>
-
-      <div class="max-w-7xl mx-auto px-6 py-8 space-y-6">
+      <div class="max-w-7xl mx-auto px-6 py-8 space-y-6 data-panel">
 
         <!-- Summary cards -->
         <div class="grid grid-cols-3 gap-4 stagger">
@@ -160,7 +137,9 @@
             </div>
             <div>
               <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total cases</p>
-              <p class="text-2xl font-extrabold text-brand-600">{{ stats.summary.total }}</p>
+              <Transition name="num" mode="out-in">
+                <p :key="stats.summary.total" class="text-2xl font-extrabold text-brand-600">{{ stats.summary.total }}</p>
+              </Transition>
             </div>
           </div>
           <div class="card p-5 flex items-center gap-4">
@@ -169,7 +148,9 @@
             </div>
             <div>
               <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Active cases</p>
-              <p class="text-2xl font-extrabold text-blue-600">{{ stats.summary.active }}</p>
+              <Transition name="num" mode="out-in">
+                <p :key="stats.summary.active" class="text-2xl font-extrabold text-blue-600">{{ stats.summary.active }}</p>
+              </Transition>
             </div>
           </div>
           <div class="card p-5 flex items-center gap-4">
@@ -178,7 +159,9 @@
             </div>
             <div>
               <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Closed cases</p>
-              <p class="text-2xl font-extrabold text-green-600">{{ stats.summary.closed }}</p>
+              <Transition name="num" mode="out-in">
+                <p :key="stats.summary.closed" class="text-2xl font-extrabold text-green-600">{{ stats.summary.closed }}</p>
+              </Transition>
             </div>
           </div>
         </div>
@@ -265,7 +248,6 @@
         </div>
 
       </div>
-      </div><!-- end relative overlay wrapper -->
     </template>
 
     <!-- Error -->
@@ -293,9 +275,8 @@ import {
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend)
 
 const loading = ref(true)
-const filtering = ref(false)   // subtle loading indicator when filters change
 const stats = ref(null)
-const allCefmuTypes = ref([])  // stable list from unfiltered data for the dropdown
+const allCefmuTypes = ref([])
 const lastUpdatedAt = ref(null)
 let pollTimer = null
 let labelTimer = null
@@ -361,14 +342,12 @@ async function loadData(params = {}, opts = {}) {
 
 // ── Watch filters → re-fetch with params ─────────────────────
 watch([filterStatus, filterClass, filterSex, filterCefmuType], async () => {
-  filtering.value = true
   await loadData(filterParams(), { skipCache: false,
     revalidate(fresh) {
       stats.value = fresh
       lastUpdatedAt.value = Date.now()
     }
   })
-  filtering.value = false
 })
 
 // ── Polling — re-fetch every 5 minutes ───────────────────────
@@ -465,16 +444,14 @@ const horizOpts = {
 }
 </script>
 <style scoped>
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
+/* Summary number swap animation */
+.num-enter-active { transition: opacity 0.2s ease, transform 0.2s ease; }
+.num-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
+.num-enter-from   { opacity: 0; transform: translateY(6px); }
+.num-leave-to     { opacity: 0; transform: translateY(-6px); }
 
-.progress-bar {
-  width: 40%;
-  animation: progressBar 1.4s ease-in-out infinite;
-}
-@keyframes progressBar {
-  0%   { transform: translateX(-100%); width: 40%; }
-  50%  { width: 60%; }
-  100% { transform: translateX(280%); width: 40%; }
+/* Charts fade when data swaps */
+.data-panel canvas {
+  transition: opacity 0.3s ease;
 }
 </style>
