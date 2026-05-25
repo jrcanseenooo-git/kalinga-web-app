@@ -144,22 +144,21 @@ function getCase(e, user) {
   if (user.role === 'cpu_monitor'    && found.lgu_code !== user.lgu_code)       return _error('Forbidden', 403);
 
   // Attach services
-  const svcSheet = _getSheet('services');
+  const svcSheet = ss.getSheetByName('services');
   found._services = svcSheet
-    ? _sheetToObjects(svcSheet).filter(s => s.case_id === id)
+    ? _sheetToObjectsSS(ss, 'services').filter(s => String(s.case_id) === String(id))
     : [];
 
-  // Attach family members from dedicated sheet
-  const famSheet = _getSheet(FAMILY_SHEET);
+  const famSheet = ss.getSheetByName(FAMILY_SHEET);
   if (famSheet) {
-    found._family = _sheetToObjects(famSheet).filter(f => String(f.case_id) === String(id));
+    found._family = _sheetToObjectsSS(ss, FAMILY_SHEET).filter(f => String(f.case_id) === String(id));
   } else {
     // Fallback: parse JSON column
     found._family = _parseFamilyMembers(found.family_members);
   }
 
   // Attach progress notes
-  const notesSheet = _getSheet('progress_notes');
+  const notesSheet = ss.getSheetByName('progress_notes');
   if (notesSheet) {
     found._notes = _sheetToObjects(notesSheet)
       .filter(n => n.case_id === id)
