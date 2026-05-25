@@ -348,3 +348,24 @@ function addNote(params, user) {
   _logActivity(user.email, 'ADD_NOTE', params.case_id);
   return _output({ added: true });
 }
+
+// ── updateNote ───────────────────────────────────────────────
+function updateNote(params, user) {
+  if (user.role === 'cpu_monitor') return _error('Forbidden', 403);
+  const sheet = _getSheet('progress_notes');
+  if (!sheet) return _error('progress_notes sheet not found', 404);
+  const allData = sheet.getDataRange().getValues();
+  const headers = allData[0];
+  const rows    = allData.slice(1);
+  const rowIdx  = rows.findIndex(r => String(r[headers.indexOf('note_id')]) === String(params.note_id));
+  if (rowIdx === -1) return _error('Note not found', 404);
+  const sheetRow = rowIdx + 2;
+  const fields = ['note_type', 'date_note', 'content', 'action_taken', 'next_steps'];
+  fields.forEach(f => {
+    const colIdx = headers.indexOf(f);
+    if (colIdx >= 0 && params[f] !== undefined) {
+      sheet.getRange(sheetRow, colIdx + 1).setValue(params[f] || '');
+    }
+  });
+  return _output({ updated: true });
+}
