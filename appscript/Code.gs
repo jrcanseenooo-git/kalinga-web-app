@@ -3,7 +3,7 @@
 // Deploy as: Execute as Me | Who has access: Anyone
 // ============================================================
 
-const SPREADSHEET_ID = '';
+const SPREADSHEET_ID = '1O9C0eDYsMrpWeCKIMalxT9Xlz1hxXSXS0ZzGmZYDJ3w';
 const ALLOWED_DOMAIN = 'dswd.gov.ph';
 
 // Session tokens (email/password login) are prefixed with 'ses_'
@@ -125,6 +125,7 @@ function doGet(e) {
     case 'reopenCase': return reopenCase(params, user);
     case 'addService': return addService(params, user);
     case 'addNote': return addNote(params, user);
+    case 'updateNote': return updateNote(params, user);
     case 'createUser': return createUser(params, user);
     case 'updateUser': return updateUser(params, user);
     case 'toggleUser': return toggleUser(params, user);
