@@ -228,7 +228,7 @@
         <div class="flex items-center justify-between py-4 border-t border-gray-100">
           <div class="flex items-center gap-3">
             <img src="/logo-purple.png" alt="Kalinga" class="h-7 w-auto opacity-50" />
-            <p class="text-xs text-gray-400">DSWD Kalinga Program — CEFMU Registry System</p>
+            <p class="text-xs text-gray-400">DSWD Kalinga Program | CEFMU Registry System</p>
           </div>
           <div class="flex items-center gap-4">
             <div class="flex items-center gap-1.5">
