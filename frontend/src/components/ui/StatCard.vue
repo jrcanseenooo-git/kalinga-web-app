@@ -9,7 +9,7 @@
         <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">{{ label }}</p>
         <p class="stat-number" :class="textColor">
           <span v-if="loading" class="inline-block w-16 h-9 bg-gray-100 rounded-lg animate-pulse-soft"></span>
-          <span v-else>{{ value ?? '—' }}</span>
+          <span v-else>{{ value ?? '-' }}</span>
         </p>
         <p v-if="sub" class="text-xs text-gray-400 mt-1">{{ sub }}</p>
       </div>
