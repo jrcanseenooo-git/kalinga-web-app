@@ -49,7 +49,10 @@ const routes = [
     path: "/cases/:id/edit",
     name: "case-edit",
     component: CaseFormView,
-    meta: { auth: true, roles: ["admin", "case_worker"] },
+    meta: {
+      auth: true,
+      roles: ["admin", "case_worker", "fo_user", "lgu_supervisor"],
+    },
   },
   {
     path: "/users",
