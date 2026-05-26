@@ -259,29 +259,53 @@
               {{ editingMemberIndex !== null ? '✏️ Editing family member' : '➕ Add family member' }}
             </p>
 
-            <!-- Row 1: Name, Birthdate, Age, Sex, Relationship -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-              <input v-model="memberForm.name" placeholder="Full name" class="field text-xs md:col-span-2" />
-              <input v-model="memberForm.birthdate" type="date" class="field text-xs"
-                @change="onMemberBirthdateChange" />
-              <input :value="memberComputedAge" readonly placeholder="Age"
-                class="field text-xs bg-white/70 text-gray-400 cursor-not-allowed" />
-              <select v-model="memberForm.sex" class="field text-xs">
-                <option value="">Sex</option>
-                <option>Male</option>
-                <option>Female</option>
-              </select>
+            <!-- Row 1: Name, Birthdate, Age, Sex -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 items-end">
+              <div class="md:col-span-2">
+                <label class="block text-xs text-gray-400 mb-1 ml-0.5">Full name</label>
+                <input v-model="memberForm.name" placeholder="e.g. Juan dela Cruz" class="field text-xs" />
+              </div>
+              <div>
+                <label class="block text-xs text-gray-400 mb-1 ml-0.5">Birthdate</label>
+                <input v-model="memberForm.birthdate" type="date" class="field text-xs"
+                  @change="onMemberBirthdateChange" />
+              </div>
+              <div>
+                <label class="block text-xs text-gray-400 mb-1 ml-0.5">Age</label>
+                <input :value="memberComputedAge" readonly placeholder="-"
+                  class="field text-xs bg-gray-50 text-gray-400 cursor-not-allowed" />
+              </div>
+              <div>
+                <label class="block text-xs text-gray-400 mb-1 ml-0.5">Sex</label>
+                <select v-model="memberForm.sex" class="field text-xs">
+                  <option value="">- Select -</option>
+                  <option>Male</option>
+                  <option>Female</option>
+                </select>
+              </div>
             </div>
 
             <!-- Row 2: Relationship, Education, Occupation, Income -->
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <select v-model="memberForm.relationship" class="field text-xs">
-                <option value="">Relationship</option>
-                <option v-for="r in relationships" :key="r">{{ r }}</option>
-              </select>
-              <input v-model="memberForm.education" placeholder="Education" class="field text-xs" />
-              <input v-model="memberForm.occupation" placeholder="Occupation" class="field text-xs" />
-              <input v-model="memberForm.income" placeholder="Income (₱)" type="number" class="field text-xs" />
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
+              <div>
+                <label class="block text-xs text-gray-400 mb-1 ml-0.5">Relationship</label>
+                <select v-model="memberForm.relationship" class="field text-xs">
+                  <option value="">- Select -</option>
+                  <option v-for="r in relationships" :key="r">{{ r }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-400 mb-1 ml-0.5">Education</label>
+                <input v-model="memberForm.education" placeholder="e.g. High school" class="field text-xs" />
+              </div>
+              <div>
+                <label class="block text-xs text-gray-400 mb-1 ml-0.5">Occupation</label>
+                <input v-model="memberForm.occupation" placeholder="e.g. Farmer" class="field text-xs" />
+              </div>
+              <div>
+                <label class="block text-xs text-gray-400 mb-1 ml-0.5">Monthly income (₱)</label>
+                <input v-model="memberForm.income" placeholder="0.00" type="number" class="field text-xs" />
+              </div>
             </div>
 
             <div class="flex gap-2 pt-0.5">
