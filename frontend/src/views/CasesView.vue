@@ -106,7 +106,7 @@
               class="text-xs border border-gray-200 rounded-lg pl-2 pr-6 py-1 appearance-none bg-white text-gray-600 focus:outline-none">
               <option value="date_intake_desc">Date intake (newest)</option>
               <option value="date_intake_asc">Date intake (oldest)</option>
-              <option value="name_asc">Name (A–Z)</option>
+              <option value="name_asc">Name (A-Z)</option>
               <option value="status">Status</option>
             </select>
             <ChevronDownIcon
@@ -194,7 +194,7 @@
 
               <!-- Location -->
               <td class="px-5 py-3.5 hidden lg:table-cell">
-                <p class="text-xs font-medium text-gray-700">{{ c.city_muni || '—' }}</p>
+                <p class="text-xs font-medium text-gray-700">{{ c.city_muni || '-' }}</p>
                 <p class="text-xs text-gray-400">{{ c.province || c.region || '' }}</p>
               </td>
 
@@ -327,7 +327,7 @@ const closedCount = computed(() => filtered.value.filter(c => c.status === 'clos
 const femaleCount = computed(() => filtered.value.filter(c => c.sex === 'Female').length)
 
 function parseClassif(val) {
-  if (!val) return '—'
+  if (!val) return '-'
   if (typeof val === 'string' && val.startsWith('[')) {
     try { return JSON.parse(val).join(', ') } catch { return val }
   }
@@ -343,7 +343,7 @@ function classColor(cls) {
 }
 
 function fmtDate(d) {
-  return d ? new Date(d).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : '—'
+  return d ? new Date(d).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : '-'
 }
 
 function exportCSV() {
