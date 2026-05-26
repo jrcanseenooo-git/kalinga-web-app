@@ -184,7 +184,6 @@
                 <col class="w-[12%]" /> <!-- Relationship -->
                 <col class="w-[14%]" /> <!-- Education -->
                 <col class="w-[14%]" /> <!-- Occupation -->
-                <col class="w-[9%]" /> <!-- Income -->
                 <col class="w-[12%]" /> <!-- Actions -->
               </colgroup>
               <thead class="bg-gray-50">
@@ -200,8 +199,6 @@
                   </th>
                   <th class="px-2 py-2.5 text-left font-bold text-gray-400 uppercase tracking-wider truncate">Occupation
                   </th>
-                  <th class="px-2 py-2.5 text-right font-bold text-gray-400 uppercase tracking-wider truncate">Income
-                  </th>
                   <th class="px-2 py-2.5 text-right font-bold text-gray-400 uppercase tracking-wider truncate">Actions
                   </th>
                 </tr>
@@ -216,9 +213,6 @@
                   <td class="px-2 py-2 text-gray-600 truncate">{{ m.relationship }}</td>
                   <td class="px-2 py-2 text-gray-600 truncate">{{ m.education }}</td>
                   <td class="px-2 py-2 text-gray-600 truncate">{{ m.occupation }}</td>
-                  <td class="px-2 py-2 text-right text-gray-600 truncate">
-                    {{ m.income ? '₱' + Number(m.income).toLocaleString() : '-' }}
-                  </td>
                   <td class="px-2 py-2 text-right">
                     <div class="flex items-center justify-end gap-1.5">
                       <button type="button" @click="startEditMember(i)"
@@ -259,21 +253,18 @@
               {{ editingMemberIndex !== null ? '✏️ Editing family member' : '➕ Add family member' }}
             </p>
 
-            <!-- Row 1: Name, Birthdate, Age, Sex -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 items-end">
-              <div class="md:col-span-2">
-                <label class="block text-xs text-gray-400 mb-1 ml-0.5">Full name</label>
+            <!-- Row 1: Name + Relationship + Sex (3 cols) -->
+            <div class="grid grid-cols-3 gap-3 items-end">
+              <div>
+                <label class="block text-xs text-gray-400 mb-1 ml-0.5">Full name <span class="text-red-400">*</span></label>
                 <input v-model="memberForm.name" placeholder="e.g. Juan dela Cruz" class="field text-xs" />
               </div>
               <div>
-                <label class="block text-xs text-gray-400 mb-1 ml-0.5">Birthdate</label>
-                <input v-model="memberForm.birthdate" type="date" class="field text-xs"
-                  @change="onMemberBirthdateChange" />
-              </div>
-              <div>
-                <label class="block text-xs text-gray-400 mb-1 ml-0.5">Age</label>
-                <input :value="memberComputedAge" readonly placeholder="-"
-                  class="field text-xs bg-gray-50 text-gray-400 cursor-not-allowed" />
+                <label class="block text-xs text-gray-400 mb-1 ml-0.5">Relationship to client <span class="text-red-400">*</span></label>
+                <select v-model="memberForm.relationship" class="field text-xs">
+                  <option value="">- Select -</option>
+                  <option v-for="r in relationships" :key="r">{{ r }}</option>
+                </select>
               </div>
               <div>
                 <label class="block text-xs text-gray-400 mb-1 ml-0.5">Sex</label>
@@ -285,14 +276,17 @@
               </div>
             </div>
 
-            <!-- Row 2: Relationship, Education, Occupation, Income -->
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
+            <!-- Row 2: Birthdate + Age + Education + Occupation (4 cols) -->
+            <div class="grid grid-cols-4 gap-3 items-end">
               <div>
-                <label class="block text-xs text-gray-400 mb-1 ml-0.5">Relationship</label>
-                <select v-model="memberForm.relationship" class="field text-xs">
-                  <option value="">- Select -</option>
-                  <option v-for="r in relationships" :key="r">{{ r }}</option>
-                </select>
+                <label class="block text-xs text-gray-400 mb-1 ml-0.5">Birthdate</label>
+                <input v-model="memberForm.birthdate" type="date" class="field text-xs"
+                  @change="onMemberBirthdateChange" />
+              </div>
+              <div>
+                <label class="block text-xs text-gray-400 mb-1 ml-0.5">Age (auto)</label>
+                <input :value="memberComputedAge" readonly placeholder="-"
+                  class="field text-xs bg-gray-50 text-gray-400 cursor-not-allowed" />
               </div>
               <div>
                 <label class="block text-xs text-gray-400 mb-1 ml-0.5">Education</label>
@@ -301,10 +295,6 @@
               <div>
                 <label class="block text-xs text-gray-400 mb-1 ml-0.5">Occupation</label>
                 <input v-model="memberForm.occupation" placeholder="e.g. Farmer" class="field text-xs" />
-              </div>
-              <div>
-                <label class="block text-xs text-gray-400 mb-1 ml-0.5">Monthly income (₱)</label>
-                <input v-model="memberForm.income" placeholder="0.00" type="number" class="field text-xs" />
               </div>
             </div>
 
@@ -497,7 +487,7 @@ const showMemberForm = ref(false)
 
 const emptyMember = () => ({
   name: '', birthdate: '', age: '', sex: '',
-  relationship: '', education: '', occupation: '', income: ''
+  relationship: '', education: '', occupation: ''
 })
 const memberForm = ref(emptyMember())
 
@@ -617,7 +607,6 @@ onMounted(async () => {
         relationship: m.relationship || '',
         education: m.education || '',
         occupation: m.occupation || '',
-        income: m.income || '',
       }))
     } else if (data.family_members) {
       // Fallback: parse legacy JSON column
@@ -630,8 +619,7 @@ onMounted(async () => {
           relationship: m.relationship || '',
           education: m.education || '',
           occupation: m.occupation || '',
-          income: m.income || '',
-        }))
+          }))
       } catch (e) { }
     }
   } else {
