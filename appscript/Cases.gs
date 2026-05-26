@@ -41,6 +41,7 @@ function _sheetToObjects(sheet) {
 
 function _stringify(val) {
   if (val === undefined || val === null) return '';
+  if (Array.isArray(val)) return val.join(', ');
   if (typeof val === 'object') return JSON.stringify(val);
   return String(val);
 }
@@ -187,6 +188,7 @@ function createCase(params, user) {
       default:
         const val = params[col];
         if (val === undefined || val === null) return '';
+        if (Array.isArray(val)) return val.join(', ');
         if (typeof val === 'object') return JSON.stringify(val);
         return String(val);
     }
@@ -226,7 +228,8 @@ function updateCase(params, user) {
     if (col === 'family_members') { sheet.getRange(sheetRow, i + 1).setValue(members.length ? JSON.stringify(members) : '[]'); return; }
     if (params[col] !== undefined) {
       const val = params[col];
-      sheet.getRange(sheetRow, i + 1).setValue(typeof val === 'object' ? JSON.stringify(val) : String(val === null ? '' : val));
+      const cellVal = Array.isArray(val) ? val.join(', ') : (typeof val === 'object' ? JSON.stringify(val) : String(val === null ? '' : val));
+      sheet.getRange(sheetRow, i + 1).setValue(cellVal);
     }
   });
   _saveFamilyMembers(params.case_id, members, {
