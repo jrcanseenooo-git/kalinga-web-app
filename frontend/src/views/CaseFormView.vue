@@ -372,7 +372,7 @@ import {
 
 const classificationOptions = [
   'Child marriage',
-  'Early union (informal cohabitation)',
+  'Early union',
   'Forced marriage',
 ]
 
