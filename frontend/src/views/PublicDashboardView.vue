@@ -33,7 +33,7 @@
             <div
               class="mt-4 bg-amber-400/15 border border-amber-300/30 rounded-xl px-4 py-2.5 text-xs text-amber-200 flex items-start gap-2">
               <InformationCircleIcon class="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <span><strong>Pilot area data only.</strong> Figures shown are from pilot areas and may not reflect the
+              <span><strong>Pilot area data only.</strong> Figures shown are currently from pilot areas and may not reflect the
                 complete national picture. No personally identifiable information is displayed.</span>
             </div>
           </div>
