@@ -67,8 +67,7 @@
       <div class="card p-6 mb-4">
         <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div class="flex items-start gap-4">
-            <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-xl flex-shrink-0 font-bold"
-              :class="caseData.classification === 'child' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'">
+            <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-xl flex-shrink-0 font-bold bg-brand-100 text-brand-600">
               {{ caseData.client_first?.charAt(0) }}{{ caseData.client_last?.charAt(0) }}
             </div>
             <div>
@@ -85,8 +84,8 @@
             </div>
           </div>
           <div class="flex items-center gap-2 flex-shrink-0">
-            <span class="badge capitalize" :class="classColor(caseData.classification)">
-              {{ caseData.classification }}
+            <span class="badge bg-brand-50 text-brand-700">
+              {{ parseClassif(caseData.classification) }}
             </span>
             <span class="badge"
               :class="caseData.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'">
@@ -308,7 +307,8 @@
           <ClipboardDocumentListIcon class="w-4 h-4 text-gray-400" /> Case Info
         </h3>
         <dl class="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4 text-sm">
-          <InfoItem label="CEFMU type" :value="caseData.cefmu_type" />
+          <InfoItem label="Classification" :value="parseClassif(caseData.classification)" />
+          <InfoItem label="Other circumstances" :value="parseClassif(caseData.other_circumstances)" />
           <InfoItem label="Mode of admission" :value="caseData.admission_mode" />
           <InfoItem label="Date of intake" :value="fmtDate(caseData.date_intake)" />
           <InfoItem label="Referred by" :value="caseData.referred_by" />
@@ -845,8 +845,16 @@ const parsedFamily = computed(() => {
   return []
 })
 
+function parseClassif(val) {
+  if (!val) return '—'
+  if (typeof val === 'string' && val.startsWith('[')) {
+    try { return JSON.parse(val).join(', ') } catch { return val }
+  }
+  return val
+}
+
 function classColor(cls) {
-  return { child: 'bg-blue-50 text-blue-700', pwd: 'bg-purple-50 text-purple-700' }[cls] || 'bg-gray-100 text-gray-600'
+  return 'bg-brand-50 text-brand-700'
 }
 
 function fmtDate(d) {
