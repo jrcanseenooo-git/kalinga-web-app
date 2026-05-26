@@ -72,7 +72,7 @@
                 <span v-if="u.region" class="block">{{ u.region }}</span>
                 <span v-if="u.province" class="block">{{ u.province }}</span>
                 <span v-if="u.lgu_code">LGU: {{ u.lgu_code }}</span>
-                <span v-if="!u.region && !u.province && !u.lgu_code">—</span>
+                <span v-if="!u.region && !u.province && !u.lgu_code">-</span>
               </td>
               <td class="px-5 py-3.5">
                 <span class="badge" :class="(u.active === true || u.active === 'TRUE')
@@ -129,7 +129,7 @@
             <div>
               <label class="block text-xs font-semibold text-gray-600 mb-1.5">Role</label>
               <select v-model="form.role" class="input-base">
-                <option value="">— Select role —</option>
+                <option value="">- Select role -</option>
                 <option value="admin">Admin (all cases nationwide)</option>
                 <option value="case_worker">Case Worker (own cases only)</option>
                 <option value="fo_user">Field Office User (by region)</option>
@@ -139,19 +139,19 @@
               <p class="text-xs text-gray-400 mt-1">{{ roleScopeHint }}</p>
             </div>
 
-            <!-- Region — show for fo_user -->
+            <!-- Region - show for fo_user -->
             <div v-if="form.role === 'fo_user'">
               <label class="block text-xs font-semibold text-gray-600 mb-1.5">
                 Region <span class="text-red-400">*</span>
               </label>
               <select v-model="form.region" class="input-base">
-                <option value="">— Select region —</option>
+                <option value="">- Select region -</option>
                 <option v-for="r in regionOptions" :key="r" :value="r">{{ r }}</option>
               </select>
               <p class="text-xs text-gray-400 mt-1">User will see all cases from this region.</p>
             </div>
 
-            <!-- Province — show for lgu_supervisor -->
+            <!-- Province - show for lgu_supervisor -->
             <div v-if="form.role === 'lgu_supervisor'">
               <label class="block text-xs font-semibold text-gray-600 mb-1.5">
                 Province <span class="text-red-400">*</span>
@@ -162,7 +162,7 @@
               <p class="text-xs text-gray-400 mt-1">User will see all cases from this province.</p>
             </div>
 
-            <!-- LGU code — show for case_worker and cpu_monitor -->
+            <!-- LGU code - show for case_worker and cpu_monitor -->
             <div v-if="form.role === 'case_worker' || form.role === 'cpu_monitor'">
               <label class="block text-xs font-semibold text-gray-600 mb-1.5">LGU code</label>
               <input v-model="form.lgu_code" type="text"
@@ -322,7 +322,7 @@ function roleLabel(role) {
     lgu_supervisor: 'LGU Supervisor',
     cpu_monitor:    'CPU Monitor',
   }
-  return labels[role] || role?.replace('_', ' ') || '—'
+  return labels[role] || role?.replace('_', ' ') || '-'
 }
 
 function roleColor(role) {
