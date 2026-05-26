@@ -82,84 +82,84 @@
         <fieldset class="space-y-4 border-t pt-4">
           <legend class="text-xs font-semibold uppercase tracking-wider text-brand-600">IV. Case details</legend>
 
+          <!-- Row 1: Classification (1 col) + Additional circumstances (2 cols) -->
           <div class="grid grid-cols-3 gap-3">
-            <!-- Client type — CEFMU clients are children -->
-            <div>
-              <label class="block text-xs font-semibold text-gray-600 mb-1.5">Client type <span class="text-red-400">*</span></label>
-              <select v-model="form.classification" class="field" required>
-                <option value="">— Select —</option>
-                <option value="Child">Child</option>
-                <option value="Child with Disability">Child with Disability</option>
-                <option value="Child with Special Needs">Child with Special Needs</option>
-              </select>
-            </div>
-
-            <!-- Classification — primary type -->
+            <!-- Classification multi-select -->
             <div>
               <label class="block text-xs font-semibold text-gray-600 mb-1.5">Classification <span class="text-red-400">*</span></label>
-              <select v-model="form.cefmu_type" class="field" required>
-                <option value="">— Select primary type —</option>
-                <option value="Child marriage">Child marriage</option>
-                <option value="Early union">Early union (informal cohabitation)</option>
-                <option value="Forced marriage">Forced marriage</option>
-              </select>
-            </div>
-
-            <FormField label="Date of intake" v-model="form.date_intake" type="date" required />
-          </div>
-
-          <!-- Additional circumstances — always visible multi-select dropdown -->
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1.5">
-              Additional / co-occurring circumstances
-              <span class="text-gray-400 font-normal ml-1">(select all that apply)</span>
-            </label>
-            <div class="relative" ref="circumDropdownRef">
-              <!-- Trigger button -->
-              <button type="button" @click="showCircumDropdown = !showCircumDropdown"
-                class="field flex items-center justify-between w-full text-left">
-                <span :class="form.other_circumstances.length ? 'text-gray-800' : 'text-gray-400'">
-                  {{ form.other_circumstances.length
-                    ? form.other_circumstances.join(', ')
-                    : '— Select circumstances —' }}
-                </span>
-                <svg class="w-4 h-4 text-gray-400 flex-shrink-0 ml-2 transition-transform"
-                  :class="showCircumDropdown ? 'rotate-180' : ''"
-                  fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                </svg>
-              </button>
-              <!-- Dropdown -->
-              <div v-if="showCircumDropdown"
-                class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
-                <div class="p-2 space-y-0.5 max-h-60 overflow-y-auto">
-                  <label v-for="opt in otherCircumstances" :key="opt"
-                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-colors hover:bg-gray-50"
-                    :class="form.other_circumstances.includes(opt) ? 'bg-brand-50' : ''">
-                    <div class="w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors"
-                      :class="form.other_circumstances.includes(opt)
-                        ? 'bg-brand-600 border-brand-600'
-                        : 'border-gray-300'">
-                      <svg v-if="form.other_circumstances.includes(opt)"
-                        class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
-                      </svg>
-                    </div>
-                    <input type="checkbox" class="hidden" :value="opt" v-model="form.other_circumstances" />
-                    <span class="text-sm" :class="form.other_circumstances.includes(opt) ? 'text-brand-700 font-semibold' : 'text-gray-700'">
-                      {{ opt }}
-                    </span>
-                  </label>
-                </div>
-                <div class="border-t border-gray-100 px-3 py-2 flex items-center justify-between">
-                  <span class="text-xs text-gray-400">{{ form.other_circumstances.length }} selected</span>
-                  <button type="button" @click="form.other_circumstances = []; showCircumDropdown = false"
-                    class="text-xs text-red-500 hover:text-red-700 font-semibold">Clear all</button>
+              <div class="relative" ref="classifDropdownRef">
+                <button type="button" @click="showClassifDropdown = !showClassifDropdown"
+                  class="field flex items-center justify-between w-full text-left min-h-[38px]">
+                  <span class="truncate pr-2 text-sm" :class="form.classification.length ? 'text-gray-800' : 'text-gray-400'">
+                    {{ form.classification.length ? form.classification.join(', ') : '— Select —' }}
+                  </span>
+                  <svg class="w-4 h-4 text-gray-400 flex-shrink-0 transition-transform" :class="showClassifDropdown ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </button>
+                <div v-if="showClassifDropdown" class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+                  <div class="p-2 space-y-0.5 max-h-52 overflow-y-auto">
+                    <label v-for="opt in classificationOptions" :key="opt"
+                      class="flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-50"
+                      :class="form.classification.includes(opt) ? 'bg-brand-50' : ''">
+                      <div class="w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0"
+                        :class="form.classification.includes(opt) ? 'bg-brand-600 border-brand-600' : 'border-gray-300'">
+                        <svg v-if="form.classification.includes(opt)" class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                        </svg>
+                      </div>
+                      <input type="checkbox" class="hidden" :value="opt" v-model="form.classification" />
+                      <span class="text-sm" :class="form.classification.includes(opt) ? 'text-brand-700 font-semibold' : 'text-gray-700'">{{ opt }}</span>
+                    </label>
+                  </div>
+                  <div class="border-t border-gray-100 px-3 py-2 flex items-center justify-between">
+                    <span class="text-xs text-gray-400">{{ form.classification.length }} selected</span>
+                    <button type="button" @click="form.classification = []" class="text-xs text-red-500 hover:text-red-700 font-semibold">Clear</button>
+                  </div>
                 </div>
               </div>
             </div>
+            <!-- Additional circumstances multi-select -->
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1.5">
+                Additional / co-occurring circumstances
+              </label>
+              <div class="relative" ref="circumDropdownRef">
+                <button type="button" @click="showCircumDropdown = !showCircumDropdown"
+                  class="field flex items-center justify-between w-full text-left min-h-[38px]">
+                  <span class="truncate pr-2 text-sm" :class="form.other_circumstances.length ? 'text-gray-800' : 'text-gray-400'">
+                    {{ form.other_circumstances.length ? form.other_circumstances.join(', ') : '— Select circumstances —' }}
+                  </span>
+                  <svg class="w-4 h-4 text-gray-400 flex-shrink-0 transition-transform" :class="showCircumDropdown ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </button>
+                <div v-if="showCircumDropdown" class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+                  <div class="p-2 space-y-0.5 max-h-56 overflow-y-auto">
+                    <label v-for="opt in otherCircumstances" :key="opt"
+                      class="flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-50"
+                      :class="form.other_circumstances.includes(opt) ? 'bg-brand-50' : ''">
+                      <div class="w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0"
+                        :class="form.other_circumstances.includes(opt) ? 'bg-brand-600 border-brand-600' : 'border-gray-300'">
+                        <svg v-if="form.other_circumstances.includes(opt)" class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                        </svg>
+                      </div>
+                      <input type="checkbox" class="hidden" :value="opt" v-model="form.other_circumstances" />
+                      <span class="text-sm" :class="form.other_circumstances.includes(opt) ? 'text-brand-700 font-semibold' : 'text-gray-700'">{{ opt }}</span>
+                    </label>
+                  </div>
+                  <div class="border-t border-gray-100 px-3 py-2 flex items-center justify-between">
+                    <span class="text-xs text-gray-400">{{ form.other_circumstances.length }} selected</span>
+                    <button type="button" @click="form.other_circumstances = []; showCircumDropdown = false" class="text-xs text-red-500 hover:text-red-700 font-semibold">Clear all</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <FormField label="Date of intake" v-model="form.date_intake" type="date" required />
           </div>
 
+          <!-- Row 2: Mode of admission + Referred by + Referral date -->
           <div class="grid grid-cols-3 gap-3">
             <SelectField label="Mode of admission" v-model="form.admission_mode" :options="admissionModes" />
             <FormField label="Referred by (person/org)" v-model="form.referred_by" />
@@ -368,6 +368,15 @@ import {
   relationships, cefmuTypes, admissionModes
 } from '@/data/psgc'
 
+const classificationOptions = [
+  'Child marriage',
+  'Early union (informal cohabitation)',
+  'Forced marriage',
+]
+
+const showClassifDropdown = ref(false)
+const classifDropdownRef  = ref(null)
+
 const otherCircumstances = [
   'Child with Disability',
   'Child with Special Needs',
@@ -386,12 +395,32 @@ const showCircumDropdown = ref(false)
 const circumDropdownRef  = ref(null)
 
 // Close dropdown when clicking outside
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('click', (e) => {
     if (circumDropdownRef.value && !circumDropdownRef.value.contains(e.target)) {
       showCircumDropdown.value = false
     }
+    if (classifDropdownRef.value && !classifDropdownRef.value.contains(e.target)) {
+      showClassifDropdown.value = false
+    }
   })
+  // Load case for edit
+  if (isEdit.value) {
+    const data = await api('getCase', { case_id: route.params.id })
+    const dateFields = ['birthdate', 'date_intake', 'referral_date']
+    Object.keys(form.value).forEach(k => {
+      if (data[k] !== undefined && data[k] !== null) {
+        if (k === 'classification' || k === 'other_circumstances') {
+          // Parse array fields from JSON string if needed
+          try {
+            form.value[k] = Array.isArray(data[k]) ? data[k] : JSON.parse(data[k] || '[]')
+          } catch { form.value[k] = [] }
+        } else {
+          form.value[k] = dateFields.includes(k) ? toDateInput(data[k]) : data[k]
+        }
+      }
+    })
+  }
 })
 
 const route = useRoute()
@@ -426,7 +455,6 @@ function calcAge(bdStr) {
 }
 
 // ─── Form state ───────────────────────────────────────────────
-// ─── Form state ───────────────────────────────────────────────
 const emptyForm = () => ({
   client_last: '', client_first: '', client_mi: '', suffix: '',
   birthdate: '', sex: '', civil_status: '', religion: '',
@@ -434,8 +462,8 @@ const emptyForm = () => ({
   income: '', philhealth_no: '',
   present_street: '', region: '', province: '', city_muni: '', barangay: '',
   per_street: '', per_region: '', per_province: '', per_city_muni: '', per_barangay: '',
-  classification: '', cefmu_type: '', other_circumstances: [], admission_mode: '',
-  aics_form_no: '', date_intake: '', lgu_code: '',
+  classification: [], cefmu_type: '', other_circumstances: [], admission_mode: '',
+  aics_form_no: '', date_intake: new Date().toISOString().slice(0, 10), lgu_code: '',
   referred_by: '', referral_date: '',
   presenting_problem: '', initial_assessment: '', plan_of_action: '', remarks: '',
 })
@@ -447,8 +475,8 @@ const form = ref({
   income: '', philhealth_no: '',
   present_street: '', region: '', province: '', city_muni: '', barangay: '',
   per_street: '', per_region: '', per_province: '', per_city_muni: '', per_barangay: '',
-  classification: '', cefmu_type: '', other_circumstances: [], admission_mode: '',
-  aics_form_no: '', date_intake: '', lgu_code: '',
+  classification: [], cefmu_type: '', other_circumstances: [], admission_mode: '',
+  aics_form_no: '', date_intake: new Date().toISOString().slice(0, 10), lgu_code: '',
   referred_by: '', referral_date: '',
   presenting_problem: '', initial_assessment: '', plan_of_action: '', remarks: '',
 })
@@ -627,8 +655,8 @@ function confirmSubmit() {
     error.value = 'Please select a region.'
     return
   }
-  if (!form.value.classification) {
-    error.value = 'Please select a classification.'
+  if (!form.value.classification.length) {
+    error.value = 'Please select at least one classification.'
     return
   }
   error.value = null
