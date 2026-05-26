@@ -326,12 +326,20 @@ const activeCount = computed(() => filtered.value.filter(c => c.status === 'acti
 const closedCount = computed(() => filtered.value.filter(c => c.status === 'closed').length)
 const femaleCount = computed(() => filtered.value.filter(c => c.sex === 'Female').length)
 
+function parseClassif(val) {
+  if (!val) return '—'
+  if (typeof val === 'string' && val.startsWith('[')) {
+    try { return JSON.parse(val).join(', ') } catch { return val }
+  }
+  return val
+}
+
+function classifyColor(cls) {
+  return 'bg-brand-100 text-brand-600'
+}
+
 function classColor(cls) {
-  const c = (cls || '').toLowerCase()
-  return {
-    child: 'bg-blue-50 text-blue-700',
-    pwd: 'bg-purple-50 text-purple-700',
-  }[c] || 'bg-gray-100 text-gray-600'
+  return 'bg-brand-50 text-brand-700'
 }
 
 function fmtDate(d) {
