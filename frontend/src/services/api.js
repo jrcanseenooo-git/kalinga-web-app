@@ -16,10 +16,10 @@ const _cache = new Map()
 
 // TTLs in milliseconds
 const CACHE_TTL = {
-  getDashboard:        2 * 60 * 1000,  // 2 min  — auth dashboard
-  getPublicDashboard:  5 * 60 * 1000,  // 5 min  — public dashboard
-  getCases:            2 * 60 * 1000,  // 2 min  — case list
-  getLookups:         30 * 60 * 1000,  // 30 min — rarely changes
+  getDashboard:        2 * 60 * 1000,  // 2 min  - auth dashboard
+  getPublicDashboard:  5 * 60 * 1000,  // 5 min  - public dashboard
+  getCases:            2 * 60 * 1000,  // 2 min  - case list
+  getLookups:         30 * 60 * 1000,  // 30 min - rarely changes
   getUsers:            5 * 60 * 1000,  // 5 min
 }
 
