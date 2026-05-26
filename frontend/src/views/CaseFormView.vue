@@ -80,7 +80,7 @@
 
         <!-- ═══ Section 4: CEFMU Details ═══ -->
         <fieldset class="space-y-4 border-t pt-4">
-          <legend class="text-xs font-semibold uppercase tracking-wider text-brand-600">IV. CEFMU case details</legend>
+          <legend class="text-xs font-semibold uppercase tracking-wider text-brand-600">IV. Case details</legend>
 
           <div class="grid grid-cols-3 gap-3">
             <!-- Client type — CEFMU clients are children -->
@@ -94,10 +94,10 @@
               </select>
             </div>
 
-            <!-- CEFMU classification — primary type -->
+            <!-- Classification — primary type -->
             <div>
-              <label class="block text-xs font-semibold text-gray-600 mb-1.5">CEFMU classification</label>
-              <select v-model="form.cefmu_type" class="field">
+              <label class="block text-xs font-semibold text-gray-600 mb-1.5">Classification <span class="text-red-400">*</span></label>
+              <select v-model="form.cefmu_type" class="field" required>
                 <option value="">— Select primary type —</option>
                 <option value="Child marriage">Child marriage</option>
                 <option value="Early union">Early union (informal cohabitation)</option>
@@ -375,10 +375,10 @@ const otherCircumstances = [
   'Child labor',
   'Child trafficking',
   'Teenage pregnancy',
-  'Abandoned / neglected',
-  'Sexually exploited / Online sexual abuse',
-  'Physically abused',
   'Psychologically / emotionally abused',
+  'Sexually exploited / Online sexual abuse',
+  'Abandoned / neglected',
+  'Physically abused',
   'Runaway / missing child',
 ]
 
