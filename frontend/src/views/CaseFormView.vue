@@ -83,62 +83,80 @@
           <legend class="text-xs font-semibold uppercase tracking-wider text-brand-600">IV. CEFMU case details</legend>
 
           <div class="grid grid-cols-3 gap-3">
-            <!-- Client type -->
+            <!-- Client type — CEFMU clients are children -->
             <div>
               <label class="block text-xs font-semibold text-gray-600 mb-1.5">Client type <span class="text-red-400">*</span></label>
               <select v-model="form.classification" class="field" required>
                 <option value="">— Select —</option>
-                <optgroup label="Child">
-                  <option value="Child">Child (below 18)</option>
-                  <option value="Child in Conflict with the Law">Child in Conflict with the Law (CICL)</option>
-                  <option value="Child at Risk">Child at Risk (CAR)</option>
-                  <option value="Child with Disability">Child with Disability (CwD)</option>
-                  <option value="Child with Special Needs">Child with Special Needs</option>
-                </optgroup>
-                <optgroup label="Adult">
-                  <option value="Person With Disability">Person with Disability (PWD)</option>
-                  <option value="Young Adult">Young Adult (18–24)</option>
-                </optgroup>
+                <option value="Child">Child</option>
+                <option value="Child with Disability">Child with Disability</option>
+                <option value="Child with Special Needs">Child with Special Needs</option>
               </select>
             </div>
 
-            <!-- CEFMU Classification (multi-select style) -->
+            <!-- CEFMU classification — primary type -->
             <div>
               <label class="block text-xs font-semibold text-gray-600 mb-1.5">CEFMU classification</label>
               <select v-model="form.cefmu_type" class="field">
                 <option value="">— Select primary type —</option>
-                <optgroup label="Child Marriage / Union">
-                  <option value="Child marriage">Child marriage</option>
-                  <option value="Early union">Early union (informal cohabitation)</option>
-                  <option value="Forced marriage">Forced marriage</option>
-                </optgroup>
-                <optgroup label="Other circumstances">
-                  <option value="Child abuse">Child abuse</option>
-                  <option value="Child labor">Child labor</option>
-                  <option value="Child trafficking">Child trafficking</option>
-                  <option value="Teenage pregnancy">Teenage pregnancy</option>
-                  <option value="Other">Other</option>
-                </optgroup>
+                <option value="Child marriage">Child marriage</option>
+                <option value="Early union">Early union (informal cohabitation)</option>
+                <option value="Forced marriage">Forced marriage</option>
               </select>
             </div>
 
             <FormField label="Date of intake" v-model="form.date_intake" type="date" required />
           </div>
 
-          <!-- Other CEFMU circumstances (multi-check) -->
-          <div v-if="form.cefmu_type">
-            <label class="block text-xs font-semibold text-gray-600 mb-2">Additional circumstances <span class="text-gray-400 font-normal">(check all that apply)</span></label>
-            <div class="flex flex-wrap gap-2">
-              <label v-for="opt in otherCircumstances" :key="opt"
-                class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border cursor-pointer transition-colors"
-                :class="form.other_circumstances.includes(opt)
-                  ? 'bg-brand-50 border-brand-400 text-brand-700 font-semibold'
-                  : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'">
-                <input type="checkbox" class="hidden"
-                  :value="opt"
-                  v-model="form.other_circumstances" />
-                {{ opt }}
-              </label>
+          <!-- Additional circumstances — always visible multi-select dropdown -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">
+              Additional / co-occurring circumstances
+              <span class="text-gray-400 font-normal ml-1">(select all that apply)</span>
+            </label>
+            <div class="relative" ref="circumDropdownRef">
+              <!-- Trigger button -->
+              <button type="button" @click="showCircumDropdown = !showCircumDropdown"
+                class="field flex items-center justify-between w-full text-left">
+                <span :class="form.other_circumstances.length ? 'text-gray-800' : 'text-gray-400'">
+                  {{ form.other_circumstances.length
+                    ? form.other_circumstances.join(', ')
+                    : '— Select circumstances —' }}
+                </span>
+                <svg class="w-4 h-4 text-gray-400 flex-shrink-0 ml-2 transition-transform"
+                  :class="showCircumDropdown ? 'rotate-180' : ''"
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+              <!-- Dropdown -->
+              <div v-if="showCircumDropdown"
+                class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+                <div class="p-2 space-y-0.5 max-h-60 overflow-y-auto">
+                  <label v-for="opt in otherCircumstances" :key="opt"
+                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-colors hover:bg-gray-50"
+                    :class="form.other_circumstances.includes(opt) ? 'bg-brand-50' : ''">
+                    <div class="w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors"
+                      :class="form.other_circumstances.includes(opt)
+                        ? 'bg-brand-600 border-brand-600'
+                        : 'border-gray-300'">
+                      <svg v-if="form.other_circumstances.includes(opt)"
+                        class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                      </svg>
+                    </div>
+                    <input type="checkbox" class="hidden" :value="opt" v-model="form.other_circumstances" />
+                    <span class="text-sm" :class="form.other_circumstances.includes(opt) ? 'text-brand-700 font-semibold' : 'text-gray-700'">
+                      {{ opt }}
+                    </span>
+                  </label>
+                </div>
+                <div class="border-t border-gray-100 px-3 py-2 flex items-center justify-between">
+                  <span class="text-xs text-gray-400">{{ form.other_circumstances.length }} selected</span>
+                  <button type="button" @click="form.other_circumstances = []; showCircumDropdown = false"
+                    class="text-xs text-red-500 hover:text-red-700 font-semibold">Clear all</button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -351,11 +369,30 @@ import {
 } from '@/data/psgc'
 
 const otherCircumstances = [
-  'Child abuse', 'Child labor', 'Child trafficking',
-  'Teenage pregnancy', 'Abandoned / neglected',
-  'Sexually exploited', 'Physically abused',
-  'Psychologically abused', 'Online sexual abuse',
+  'Child with Disability',
+  'Child with Special Needs',
+  'Child abuse',
+  'Child labor',
+  'Child trafficking',
+  'Teenage pregnancy',
+  'Abandoned / neglected',
+  'Sexually exploited / Online sexual abuse',
+  'Physically abused',
+  'Psychologically / emotionally abused',
+  'Runaway / missing child',
 ]
+
+const showCircumDropdown = ref(false)
+const circumDropdownRef  = ref(null)
+
+// Close dropdown when clicking outside
+onMounted(() => {
+  document.addEventListener('click', (e) => {
+    if (circumDropdownRef.value && !circumDropdownRef.value.contains(e.target)) {
+      showCircumDropdown.value = false
+    }
+  })
+})
 
 const route = useRoute()
 const router = useRouter()
