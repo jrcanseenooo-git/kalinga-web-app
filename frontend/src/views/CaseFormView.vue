@@ -88,7 +88,7 @@
             <div>
               <label class="block text-xs font-semibold text-gray-600 mb-1.5">Classification <span class="text-red-400">*</span></label>
               <div class="relative" ref="classifDropdownRef">
-                <button type="button" @click="showClassifDropdown = !showClassifDropdown"
+                <button type="button" @click.stop="showClassifDropdown = !showClassifDropdown"
                   class="field flex items-center justify-between w-full text-left min-h-[38px]">
                   <span class="truncate pr-2 text-sm" :class="form.classification.length ? 'text-gray-800' : 'text-gray-400'">
                     {{ form.classification.length ? form.classification.join(', ') : '— Select —' }}
@@ -101,7 +101,8 @@
                   <div class="p-2 space-y-0.5 max-h-52 overflow-y-auto">
                     <label v-for="opt in classificationOptions" :key="opt"
                       class="flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-50"
-                      :class="form.classification.includes(opt) ? 'bg-brand-50' : ''">
+                      :class="form.classification.includes(opt) ? 'bg-brand-50' : ''"
+                      @mousedown.stop>
                       <div class="w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0"
                         :class="form.classification.includes(opt) ? 'bg-brand-600 border-brand-600' : 'border-gray-300'">
                         <svg v-if="form.classification.includes(opt)" class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -114,7 +115,7 @@
                   </div>
                   <div class="border-t border-gray-100 px-3 py-2 flex items-center justify-between">
                     <span class="text-xs text-gray-400">{{ form.classification.length }} selected</span>
-                    <button type="button" @click="form.classification = []" class="text-xs text-red-500 hover:text-red-700 font-semibold">Clear</button>
+                    <button type="button" @mousedown.stop="form.classification = []" class="text-xs text-red-500 hover:text-red-700 font-semibold">Clear</button>
                   </div>
                 </div>
               </div>
@@ -125,7 +126,7 @@
                 Additional / co-occurring circumstances
               </label>
               <div class="relative" ref="circumDropdownRef">
-                <button type="button" @click="showCircumDropdown = !showCircumDropdown"
+                <button type="button" @click.stop="showCircumDropdown = !showCircumDropdown"
                   class="field flex items-center justify-between w-full text-left min-h-[38px]">
                   <span class="truncate pr-2 text-sm" :class="form.other_circumstances.length ? 'text-gray-800' : 'text-gray-400'">
                     {{ form.other_circumstances.length ? form.other_circumstances.join(', ') : '— Select circumstances —' }}
@@ -138,7 +139,8 @@
                   <div class="p-2 space-y-0.5 max-h-56 overflow-y-auto">
                     <label v-for="opt in otherCircumstances" :key="opt"
                       class="flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-50"
-                      :class="form.other_circumstances.includes(opt) ? 'bg-brand-50' : ''">
+                      :class="form.other_circumstances.includes(opt) ? 'bg-brand-50' : ''"
+                      @mousedown.stop>
                       <div class="w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0"
                         :class="form.other_circumstances.includes(opt) ? 'bg-brand-600 border-brand-600' : 'border-gray-300'">
                         <svg v-if="form.other_circumstances.includes(opt)" class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -151,7 +153,7 @@
                   </div>
                   <div class="border-t border-gray-100 px-3 py-2 flex items-center justify-between">
                     <span class="text-xs text-gray-400">{{ form.other_circumstances.length }} selected</span>
-                    <button type="button" @click="form.other_circumstances = []; showCircumDropdown = false" class="text-xs text-red-500 hover:text-red-700 font-semibold">Clear all</button>
+                    <button type="button" @mousedown.stop="form.other_circumstances = []; showCircumDropdown = false" class="text-xs text-red-500 hover:text-red-700 font-semibold">Clear all</button>
                   </div>
                 </div>
               </div>
@@ -395,8 +397,8 @@ const showCircumDropdown = ref(false)
 const circumDropdownRef  = ref(null)
 
 // Close dropdown when clicking outside
-onMounted(async () => {
-  document.addEventListener('click', (e) => {
+onMounted(() => {
+  document.addEventListener('mousedown', (e) => {
     if (circumDropdownRef.value && !circumDropdownRef.value.contains(e.target)) {
       showCircumDropdown.value = false
     }
@@ -404,23 +406,6 @@ onMounted(async () => {
       showClassifDropdown.value = false
     }
   })
-  // Load case for edit
-  if (isEdit.value) {
-    const data = await api('getCase', { case_id: route.params.id })
-    const dateFields = ['birthdate', 'date_intake', 'referral_date']
-    Object.keys(form.value).forEach(k => {
-      if (data[k] !== undefined && data[k] !== null) {
-        if (k === 'classification' || k === 'other_circumstances') {
-          // Parse array fields from JSON string if needed
-          try {
-            form.value[k] = Array.isArray(data[k]) ? data[k] : JSON.parse(data[k] || '[]')
-          } catch { form.value[k] = [] }
-        } else {
-          form.value[k] = dateFields.includes(k) ? toDateInput(data[k]) : data[k]
-        }
-      }
-    })
-  }
 })
 
 const route = useRoute()
@@ -583,7 +568,18 @@ onMounted(async () => {
 
     Object.keys(form.value).forEach(k => {
       if (data[k] !== undefined && data[k] !== null) {
-        form.value[k] = dateFields.includes(k) ? toDateInput(data[k]) : data[k]
+        if (k === 'classification' || k === 'other_circumstances') {
+          // Parse back to array — handles both plain text and legacy JSON
+          try {
+            const val = data[k]
+            if (!val || val === '[]') { form.value[k] = []; return }
+            if (Array.isArray(val)) { form.value[k] = val; return }
+            if (val.startsWith('[')) { form.value[k] = JSON.parse(val) }
+            else { form.value[k] = val.split(', ').map(s => s.trim()).filter(Boolean) }
+          } catch { form.value[k] = [] }
+        } else {
+          form.value[k] = dateFields.includes(k) ? toDateInput(data[k]) : data[k]
+        }
       }
     })
 
