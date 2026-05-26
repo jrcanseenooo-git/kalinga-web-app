@@ -201,7 +201,21 @@ function getLookups(e, user) {
 function _groupCount(arr, key) {
   var acc = {};
   arr.forEach(function (item) {
-    var k = item[key] || "Unknown";
+    var val = item[key];
+    // Handle JSON array (e.g. classification stored as ["Child marriage","Early union"])
+    if (typeof val === 'string' && val.charAt(0) === '[') {
+      try {
+        var parsed = JSON.parse(val);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(function(k) {
+            k = k || 'Unknown';
+            acc[k] = (acc[k] || 0) + 1;
+          });
+          return;
+        }
+      } catch(e) {}
+    }
+    var k = val || 'Unknown';
     acc[k] = (acc[k] || 0) + 1;
   });
   return acc;
