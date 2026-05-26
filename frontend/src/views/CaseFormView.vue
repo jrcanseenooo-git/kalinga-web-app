@@ -83,10 +83,63 @@
           <legend class="text-xs font-semibold uppercase tracking-wider text-brand-600">IV. CEFMU case details</legend>
 
           <div class="grid grid-cols-3 gap-3">
-            <SelectField label="Classification" v-model="form.classification"
-              :options="['Child', 'Person With Disability']" required />
-            <SelectField label="Nature of CEFMU case" v-model="form.cefmu_type" :options="cefmuTypes" />
+            <!-- Client type -->
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1.5">Client type <span class="text-red-400">*</span></label>
+              <select v-model="form.classification" class="field" required>
+                <option value="">— Select —</option>
+                <optgroup label="Child">
+                  <option value="Child">Child (below 18)</option>
+                  <option value="Child in Conflict with the Law">Child in Conflict with the Law (CICL)</option>
+                  <option value="Child at Risk">Child at Risk (CAR)</option>
+                  <option value="Child with Disability">Child with Disability (CwD)</option>
+                  <option value="Child with Special Needs">Child with Special Needs</option>
+                </optgroup>
+                <optgroup label="Adult">
+                  <option value="Person With Disability">Person with Disability (PWD)</option>
+                  <option value="Young Adult">Young Adult (18–24)</option>
+                </optgroup>
+              </select>
+            </div>
+
+            <!-- CEFMU Classification (multi-select style) -->
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1.5">CEFMU classification</label>
+              <select v-model="form.cefmu_type" class="field">
+                <option value="">— Select primary type —</option>
+                <optgroup label="Child Marriage / Union">
+                  <option value="Child marriage">Child marriage</option>
+                  <option value="Early union">Early union (informal cohabitation)</option>
+                  <option value="Forced marriage">Forced marriage</option>
+                </optgroup>
+                <optgroup label="Other circumstances">
+                  <option value="Child abuse">Child abuse</option>
+                  <option value="Child labor">Child labor</option>
+                  <option value="Child trafficking">Child trafficking</option>
+                  <option value="Teenage pregnancy">Teenage pregnancy</option>
+                  <option value="Other">Other</option>
+                </optgroup>
+              </select>
+            </div>
+
             <FormField label="Date of intake" v-model="form.date_intake" type="date" required />
+          </div>
+
+          <!-- Other CEFMU circumstances (multi-check) -->
+          <div v-if="form.cefmu_type">
+            <label class="block text-xs font-semibold text-gray-600 mb-2">Additional circumstances <span class="text-gray-400 font-normal">(check all that apply)</span></label>
+            <div class="flex flex-wrap gap-2">
+              <label v-for="opt in otherCircumstances" :key="opt"
+                class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border cursor-pointer transition-colors"
+                :class="form.other_circumstances.includes(opt)
+                  ? 'bg-brand-50 border-brand-400 text-brand-700 font-semibold'
+                  : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'">
+                <input type="checkbox" class="hidden"
+                  :value="opt"
+                  v-model="form.other_circumstances" />
+                {{ opt }}
+              </label>
+            </div>
           </div>
 
           <div class="grid grid-cols-3 gap-3">
@@ -297,6 +350,13 @@ import {
   relationships, cefmuTypes, admissionModes
 } from '@/data/psgc'
 
+const otherCircumstances = [
+  'Child abuse', 'Child labor', 'Child trafficking',
+  'Teenage pregnancy', 'Abandoned / neglected',
+  'Sexually exploited', 'Physically abused',
+  'Psychologically abused', 'Online sexual abuse',
+]
+
 const route = useRoute()
 const router = useRouter()
 const isEdit = computed(() => !!route.params.id && route.path.includes('edit'))
@@ -337,7 +397,7 @@ const emptyForm = () => ({
   income: '', philhealth_no: '',
   present_street: '', region: '', province: '', city_muni: '', barangay: '',
   per_street: '', per_region: '', per_province: '', per_city_muni: '', per_barangay: '',
-  classification: '', cefmu_type: '', admission_mode: '',
+  classification: '', cefmu_type: '', other_circumstances: [], admission_mode: '',
   aics_form_no: '', date_intake: '', lgu_code: '',
   referred_by: '', referral_date: '',
   presenting_problem: '', initial_assessment: '', plan_of_action: '', remarks: '',
@@ -350,7 +410,7 @@ const form = ref({
   income: '', philhealth_no: '',
   present_street: '', region: '', province: '', city_muni: '', barangay: '',
   per_street: '', per_region: '', per_province: '', per_city_muni: '', per_barangay: '',
-  classification: '', cefmu_type: '', admission_mode: '',
+  classification: '', cefmu_type: '', other_circumstances: [], admission_mode: '',
   aics_form_no: '', date_intake: '', lgu_code: '',
   referred_by: '', referral_date: '',
   presenting_problem: '', initial_assessment: '', plan_of_action: '', remarks: '',
