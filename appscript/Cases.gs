@@ -1,8 +1,3 @@
-// ============================================================
-// Cases.gs — CRUD for cases, services, progress notes
-// Optimized: single openById per request, caching on getCase
-// ============================================================
-
 const CASE_SHEET   = 'cases';
 const FAMILY_SHEET = 'family_members';
 
@@ -347,25 +342,16 @@ function updateNote(params, user) {
   return _output({ updated: true });
 }
 // ── Case Locations Sheet ──────────────────────────────────────
-// Tracks client location history — each save creates a new record
-// so case workers and monitors can see movement across LGUs over time
-
 const LOCATION_SHEET = 'case_locations';
 const LOCATION_COLS  = [
   'location_id',
   'case_id',
-  // Client identity
   'client_last', 'client_first', 'client_mi',
-  // Permanent address (from case record — doesn't change)
   'perm_region', 'perm_province', 'perm_city_muni', 'perm_barangay',
-  // Current location (where the client actually is now)
   'current_lgu', 'current_province', 'current_region', 'current_barangay',
   'current_address_notes',
-  // Geo coordinates
   'latitude', 'longitude',
-  // Who and when
   'recorded_by', 'recorded_at',
-  // Why location changed
   'transfer_reason',
 ];
 
