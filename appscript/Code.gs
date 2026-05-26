@@ -1,13 +1,6 @@
-// ============================================================
-// CEFMU Registry — Apps Script Web App (Code.gs)
-// Deploy as: Execute as Me | Who has access: Anyone
-// ============================================================
-
-const SPREADSHEET_ID = '1O9C0eDYsMrpWeCKIMalxT9Xlz1hxXSXS0ZzGmZYDJ3w';
+const SPREADSHEET_ID = '';
 const ALLOWED_DOMAIN = 'dswd.gov.ph';
 
-// Session tokens (email/password login) are prefixed with 'ses_'
-// so we can tell them apart from Google JWTs without guessing by length.
 const SESSION_TOKEN_PREFIX = 'ses_';
 
 function _output(data, status = 200) {
@@ -41,14 +34,6 @@ function _getParams(e) {
 }
 
 // ── Auth ──────────────────────────────────────────────────────
-// Two token types:
-//   1. 'ses_...' prefix → email/password session token (looked up in sessions sheet)
-//   2. anything else    → Google JWT (decoded, email extracted, looked up in users sheet)
-//
-// Note: Google JWTs are decoded but NOT cryptographically verified here —
-// Apps Script cannot verify RS256 signatures natively without an external call.
-// Security relies on the fact that the Apps Script URL is not public knowledge
-// and Google's OAuth flow itself already validated the token before it reached us.
 function _getAuthedUser(token) {
   if (!token) return null;
 
