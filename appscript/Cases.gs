@@ -1,7 +1,11 @@
+// ============================================================
+// Cases.gs — CRUD for cases, services, progress notes
+// Optimized: single openById per request, caching on getCase
+// ============================================================
+
 const CASE_SHEET   = 'cases';
 const FAMILY_SHEET = 'family_members';
 
-// Columns in the family_members sheet (must match setupFamilySheet)
 const FAMILY_COLS = [
   'member_id', 'case_id',
   'client_last', 'client_first', 'city_muni', 'province', 'region',
@@ -10,10 +14,12 @@ const FAMILY_COLS = [
   'created_at', 'updated_at',
 ];
 
+// ── Helpers ───────────────────────────────────────────────────
 function _getSheet(name) {
   return SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(name);
 }
 
+// Read a sheet by name using an already-open Spreadsheet reference
 function _sheetToObjectsSS(ss, name) {
   const sheet = ss.getSheetByName(name);
   if (!sheet) return [];
@@ -44,7 +50,6 @@ function _stringify(val) {
   return String(val);
 }
 
-// Parse family_members — handles array, JSON string, or empty
 function _parseFamilyMembers(val) {
   if (!val) return [];
   if (Array.isArray(val)) return val;
@@ -54,13 +59,10 @@ function _parseFamilyMembers(val) {
   return [];
 }
 
-// ── Save family members to dedicated sheet ───────────────────
-// Deletes existing rows for this case, then re-inserts
+// ── Save family members ───────────────────────────────────────
 function _saveFamilyMembers(caseId, members, caseSnapshot) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   let sheet = ss.getSheetByName(FAMILY_SHEET);
-
-  // Auto-create sheet if missing
   if (!sheet) {
     sheet = ss.insertSheet(FAMILY_SHEET);
     sheet.getRange(1, 1, 1, FAMILY_COLS.length).setValues([FAMILY_COLS]);
@@ -68,33 +70,25 @@ function _saveFamilyMembers(caseId, members, caseSnapshot) {
       .setFontWeight('bold').setBackground('#4B2E8C').setFontColor('#ffffff');
     sheet.setFrozenRows(1);
   }
-
-  // Delete existing rows for this case (bottom-up to avoid index shift)
-  const allData = sheet.getDataRange().getValues();
-  const headers = allData[0];
+  const allData   = sheet.getDataRange().getValues();
+  const headers   = allData[0];
   const caseIdIdx = headers.indexOf('case_id');
   for (let i = allData.length - 1; i >= 1; i--) {
-    if (String(allData[i][caseIdIdx]) === String(caseId)) {
-      sheet.deleteRow(i + 1);
-    }
+    if (String(allData[i][caseIdIdx]) === String(caseId)) sheet.deleteRow(i + 1);
   }
-
   if (!members || !members.length) return;
-
   const now = new Date().toISOString();
   members.forEach(m => {
     const memberId = 'FM-' + Utilities.getUuid().replace(/-/g,'').substr(0,8).toUpperCase();
     const row = FAMILY_COLS.map(col => {
       switch (col) {
-        case 'member_id':   return memberId;
-        case 'case_id':     return caseId;
-        // Client snapshot from the case
-        case 'client_last': return _stringify(caseSnapshot.client_last);
-        case 'client_first':return _stringify(caseSnapshot.client_first);
-        case 'city_muni':   return _stringify(caseSnapshot.city_muni);
-        case 'province':    return _stringify(caseSnapshot.province);
-        case 'region':      return _stringify(caseSnapshot.region);
-        // Member fields
+        case 'member_id':    return memberId;
+        case 'case_id':      return caseId;
+        case 'client_last':  return _stringify(caseSnapshot.client_last);
+        case 'client_first': return _stringify(caseSnapshot.client_first);
+        case 'city_muni':    return _stringify(caseSnapshot.city_muni);
+        case 'province':     return _stringify(caseSnapshot.province);
+        case 'region':       return _stringify(caseSnapshot.region);
         case 'name':         return _stringify(m.name);
         case 'birthdate':    return _stringify(m.birthdate || '');
         case 'age':          return _stringify(m.age || '');
@@ -113,26 +107,41 @@ function _saveFamilyMembers(caseId, members, caseSnapshot) {
 }
 
 // ── getCases ─────────────────────────────────────────────────
+// Single openById, cached per role+user (60s TTL)
 function getCases(e, user) {
-  const status = e.parameter.status || '';
-  let cases = _sheetToObjects(_getSheet(CASE_SHEET));
+  const status   = e.parameter.status || '';
+  const cacheKey = 'cases_' + user.role + '_' + user.email + '_' + status;
 
-  if (user.role === 'case_worker') {
-    cases = cases.filter(c => c.case_worker_email === user.email);
-  } else if (user.role === 'fo_user') {
-    cases = cases.filter(c => c.region === user.region);
-  } else if (user.role === 'lgu_supervisor') {
-    cases = cases.filter(c => c.province === user.province);
-  } else if (user.role === 'cpu_monitor') {
-    cases = cases.filter(c => c.lgu_code === user.lgu_code);
-  }
+  // Try cache first
+  const cached = _cacheGet(cacheKey);
+  if (cached) return _output(cached);
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let cases = _sheetToObjectsSS(ss, CASE_SHEET);
+
+  if (user.role === 'case_worker')    cases = cases.filter(c => c.case_worker_email === user.email);
+  else if (user.role === 'fo_user')   cases = cases.filter(c => c.region   === user.region);
+  else if (user.role === 'lgu_supervisor') cases = cases.filter(c => c.province === user.province);
+  else if (user.role === 'cpu_monitor')    cases = cases.filter(c => c.lgu_code  === user.lgu_code);
+
   if (status) cases = cases.filter(c => c.status === status);
+
+  // Cache for 60 seconds
+  _cachePut(cacheKey, cases, 60);
   return _output(cases);
 }
 
 // ── getCase ──────────────────────────────────────────────────
+// Single openById for all sub-reads, 30s cache per case+role
 function getCase(e, user) {
   const id = e.parameter.case_id;
+
+  // Try cache (30s TTL — short enough for real-time feel)
+  const cacheKey = 'case_' + id + '_' + user.role;
+  const cached   = _cacheGet(cacheKey);
+  if (cached) return _output(cached);
+
+  // Open spreadsheet ONCE
   const ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
   const cases = _sheetToObjectsSS(ss, CASE_SHEET);
   const found = cases.find(c => c.case_id === id);
@@ -143,45 +152,34 @@ function getCase(e, user) {
   if (user.role === 'lgu_supervisor' && found.province !== user.province)       return _error('Forbidden', 403);
   if (user.role === 'cpu_monitor'    && found.lgu_code !== user.lgu_code)       return _error('Forbidden', 403);
 
-  // Attach services
-  const svcSheet = ss.getSheetByName('services');
-  found._services = svcSheet
-    ? _sheetToObjectsSS(ss, 'services').filter(s => String(s.case_id) === String(id))
-    : [];
+  // All sub-reads reuse same ss reference — no extra openById calls
+  found._services = _sheetToObjectsSS(ss, 'services')
+    .filter(s => String(s.case_id) === String(id));
 
-  const famSheet = ss.getSheetByName(FAMILY_SHEET);
-  if (famSheet) {
-    found._family = _sheetToObjectsSS(ss, FAMILY_SHEET).filter(f => String(f.case_id) === String(id));
-  } else {
-    // Fallback: parse JSON column
-    found._family = _parseFamilyMembers(found.family_members);
-  }
+  const famRows = _sheetToObjectsSS(ss, FAMILY_SHEET);
+  found._family = famRows.length
+    ? famRows.filter(f => String(f.case_id) === String(id))
+    : _parseFamilyMembers(found.family_members);
 
-  // Attach progress notes
-  const notesSheet = ss.getSheetByName('progress_notes');
-  if (notesSheet) {
-    found._notes = _sheetToObjects(notesSheet)
-      .filter(n => n.case_id === id)
-      .sort((a, b) => new Date(b.date_note) - new Date(a.date_note));
-  } else {
-    found._notes = [];
-  }
+  const noteRows = _sheetToObjectsSS(ss, 'progress_notes');
+  found._notes = noteRows
+    .filter(n => String(n.case_id) === String(id))
+    .sort((a, b) => new Date(b.date_note) - new Date(a.date_note));
 
+  // Cache result
+  _cachePut(cacheKey, found, 30);
   return _output(found);
 }
 
 // ── createCase ───────────────────────────────────────────────
 function createCase(params, user) {
   if (user.role === 'cpu_monitor') return _error('Forbidden', 403);
-
   const sheet   = _getSheet(CASE_SHEET);
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const now     = new Date().toISOString();
   const case_id = 'CEFMU-' + Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyyMM') +
                   '-' + Utilities.getUuid().replace(/-/g,'').substr(0,6).toUpperCase();
-
   const members = _parseFamilyMembers(params.family_members);
-
   const row = headers.map(col => {
     switch (col) {
       case 'case_id':           return case_id;
@@ -198,10 +196,7 @@ function createCase(params, user) {
         return String(val);
     }
   });
-
   sheet.appendRow(row);
-
-  // Save family members to dedicated sheet
   if (members.length > 0) {
     _saveFamilyMembers(case_id, members, {
       client_last:  params.client_last  || '',
@@ -211,7 +206,6 @@ function createCase(params, user) {
       region:       params.region       || '',
     });
   }
-
   _bustDashboardCache(user.email, user.role);
   _logActivity(user.email, 'CREATE_CASE', case_id);
   return _output({ case_id });
@@ -220,45 +214,26 @@ function createCase(params, user) {
 // ── updateCase ───────────────────────────────────────────────
 function updateCase(params, user) {
   if (user.role === 'cpu_monitor') return _error('Forbidden', 403);
-
   const sheet   = _getSheet(CASE_SHEET);
   const allData = sheet.getDataRange().getValues();
   const headers = allData[0];
   const rows    = allData.slice(1);
-
   const caseIdCol = headers.indexOf('case_id');
   const rowIdx    = rows.findIndex(r => String(r[caseIdCol]) === String(params.case_id));
   if (rowIdx === -1) return _error('Case not found', 404);
-
-  const sheetRow = rowIdx + 2;
-  const now      = new Date().toISOString();
-
+  const sheetRow  = rowIdx + 2;
+  const now       = new Date().toISOString();
   const protected_ = new Set(['case_id','status','case_worker_email','date_closed','created_at']);
-
-  const members = _parseFamilyMembers(params.family_members);
-
+  const members   = _parseFamilyMembers(params.family_members);
   headers.forEach((col, i) => {
     if (protected_.has(col)) return;
-
-    if (col === 'updated_at') {
-      sheet.getRange(sheetRow, i + 1).setValue(now);
-      return;
-    }
-
-    if (col === 'family_members') {
-      sheet.getRange(sheetRow, i + 1).setValue(members.length ? JSON.stringify(members) : '[]');
-      return;
-    }
-
+    if (col === 'updated_at')    { sheet.getRange(sheetRow, i + 1).setValue(now); return; }
+    if (col === 'family_members') { sheet.getRange(sheetRow, i + 1).setValue(members.length ? JSON.stringify(members) : '[]'); return; }
     if (params[col] !== undefined) {
       const val = params[col];
-      sheet.getRange(sheetRow, i + 1).setValue(
-        typeof val === 'object' ? JSON.stringify(val) : String(val === null ? '' : val)
-      );
+      sheet.getRange(sheetRow, i + 1).setValue(typeof val === 'object' ? JSON.stringify(val) : String(val === null ? '' : val));
     }
   });
-
-  // Sync family members to dedicated sheet
   _saveFamilyMembers(params.case_id, members, {
     client_last:  params.client_last  || rows[rowIdx][headers.indexOf('client_last')]  || '',
     client_first: params.client_first || rows[rowIdx][headers.indexOf('client_first')] || '',
@@ -266,7 +241,8 @@ function updateCase(params, user) {
     province:     params.province     || rows[rowIdx][headers.indexOf('province')]     || '',
     region:       params.region       || rows[rowIdx][headers.indexOf('region')]       || '',
   });
-
+  // Bust case cache so next load is fresh
+  try { CacheService.getScriptCache().remove('case_' + params.case_id + '_' + user.role); } catch(e) {}
   _bustDashboardCache(user.email, user.role);
   _logActivity(user.email, 'UPDATE_CASE', params.case_id);
   return _output({ updated: true });
@@ -285,6 +261,7 @@ function closeCase(params, user) {
   sheet.getRange(sheetRow, headers.indexOf('status')     + 1).setValue('closed');
   sheet.getRange(sheetRow, headers.indexOf('date_closed')+ 1).setValue(now);
   sheet.getRange(sheetRow, headers.indexOf('updated_at') + 1).setValue(now);
+  try { CacheService.getScriptCache().remove('case_' + params.case_id + '_' + user.role); } catch(e) {}
   _bustDashboardCache(user.email, user.role);
   _logActivity(user.email, 'CLOSE_CASE', params.case_id);
   return _output({ closed: true });
@@ -303,6 +280,7 @@ function reopenCase(params, user) {
   sheet.getRange(sheetRow, headers.indexOf('status')     + 1).setValue('active');
   sheet.getRange(sheetRow, headers.indexOf('date_closed')+ 1).setValue('');
   sheet.getRange(sheetRow, headers.indexOf('updated_at') + 1).setValue(now);
+  try { CacheService.getScriptCache().remove('case_' + params.case_id + '_' + user.role); } catch(e) {}
   _bustDashboardCache(user.email, user.role);
   _logActivity(user.email, 'REOPEN_CASE', params.case_id);
   return _output({ reopened: true });
@@ -315,12 +293,10 @@ function addService(params, user) {
   const now   = new Date().toISOString();
   sheet.appendRow([
     'SVC-' + Utilities.getUuid().replace(/-/g,'').substr(0,8).toUpperCase(),
-    params.case_id,
-    params.service_type  || '',
-    params.amount        || 0,
-    params.date_provided || now,
-    user.email,
+    params.case_id, params.service_type || '', params.amount || 0,
+    params.date_provided || now, user.email,
   ]);
+  try { CacheService.getScriptCache().remove('case_' + params.case_id + '_' + user.role); } catch(e) {}
   _bustDashboardCache(user.email, user.role);
   _logActivity(user.email, 'ADD_SERVICE', params.case_id);
   return _output({ added: true });
@@ -331,7 +307,7 @@ function addNote(params, user) {
   if (user.role === 'cpu_monitor') return _error('Forbidden', 403);
   let sheet = _getSheet('progress_notes');
   if (!sheet) {
-    const ss  = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     sheet = ss.insertSheet('progress_notes');
     const cols = ['note_id','case_id','date_note','note_type','content','action_taken','next_steps','created_by','created_at'];
     sheet.getRange(1,1,1,cols.length).setValues([cols]);
@@ -341,14 +317,11 @@ function addNote(params, user) {
   const now = new Date().toISOString();
   sheet.appendRow([
     'NOTE-' + Utilities.getUuid().replace(/-/g,'').substr(0,8).toUpperCase(),
-    params.case_id,
-    params.date_note    || now,
-    params.note_type    || 'progress',
-    params.content      || '',
-    params.action_taken || '',
-    params.next_steps   || '',
+    params.case_id, params.date_note || now, params.note_type || 'progress',
+    params.content || '', params.action_taken || '', params.next_steps || '',
     user.email, now,
   ]);
+  try { CacheService.getScriptCache().remove('case_' + params.case_id + '_' + user.role); } catch(e) {}
   _logActivity(user.email, 'ADD_NOTE', params.case_id);
   return _output({ added: true });
 }
@@ -364,12 +337,12 @@ function updateNote(params, user) {
   const rowIdx  = rows.findIndex(r => String(r[headers.indexOf('note_id')]) === String(params.note_id));
   if (rowIdx === -1) return _error('Note not found', 404);
   const sheetRow = rowIdx + 2;
-  const fields = ['note_type', 'date_note', 'content', 'action_taken', 'next_steps'];
-  fields.forEach(f => {
+  ['note_type','date_note','content','action_taken','next_steps'].forEach(f => {
     const colIdx = headers.indexOf(f);
     if (colIdx >= 0 && params[f] !== undefined) {
       sheet.getRange(sheetRow, colIdx + 1).setValue(params[f] || '');
     }
   });
+  try { CacheService.getScriptCache().remove('case_' + params.case_id + '_' + user.role); } catch(e) {}
   return _output({ updated: true });
 }
