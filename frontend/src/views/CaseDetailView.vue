@@ -169,8 +169,21 @@
               <!-- Leaflet map container -->
               <div v-if="mapCoords"
                 class="rounded-2xl overflow-hidden border border-gray-100 shadow-sm relative"
-                style="height: 380px;">
+                style="height: 420px;">
                 <div id="case-map" style="height: 100%; width: 100%;"></div>
+
+                <!-- Layer switcher -->
+                <div class="absolute top-3 right-3 z-[999] flex flex-col gap-1">
+                  <button v-for="layer in mapLayers" :key="layer.id"
+                    @click="switchMapLayer(layer.id)"
+                    class="text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition-all border"
+                    :class="activeMapLayer === layer.id
+                      ? 'bg-brand-600 text-white border-brand-600'
+                      : 'bg-white/95 text-gray-700 border-gray-200 hover:bg-gray-50'">
+                    {{ layer.label }}
+                  </button>
+                </div>
+
                 <!-- Coords badge -->
                 <div class="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-lg px-2.5 py-1.5 text-xs font-mono text-gray-600 shadow-sm z-[999]">
                   {{ mapCoords.lat.toFixed(5) }}, {{ mapCoords.lng.toFixed(5) }}
@@ -582,10 +595,10 @@ const loading = ref(true)
 const activeTab = ref('personal')
 
 const detailTabs = [
-  { id: 'personal', label: '👤 Personal' },
-  { id: 'address',  label: '📍 Address' },
-  { id: 'family',   label: '👨‍👩‍👧 Family' },
-  { id: 'map',      label: '🗺️ Map' },
+  { id: 'personal', label: 'Personal Details' },
+  { id: 'address',  label: 'Residential Info' },
+  { id: 'family',   label: 'Family Background' },
+  { id: 'map',      label: 'Location Map' },
 ]
 
 // ── Services ──────────────────────────────────────────────────
@@ -811,43 +824,64 @@ async function geocodeAddress() {
   }
 }
 
+const mapLayers = [
+  { id: 'street',    label: '🗺️ Street' },
+  { id: 'satellite', label: '🛰️ Satellite' },
+  { id: 'topo',      label: '⛰️ Topo' },
+  { id: 'hybrid',    label: '🏙️ Hybrid' },
+]
+const activeMapLayer = ref('street')
+
 async function initMap() {
-  // Dynamically load Leaflet CSS + JS (no npm install needed)
+  // Load Leaflet CSS
   if (!document.getElementById('leaflet-css')) {
     const link = document.createElement('link')
-    link.id    = 'leaflet-css'
-    link.rel   = 'stylesheet'
-    link.href  = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+    link.id   = 'leaflet-css'
+    link.rel  = 'stylesheet'
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
     document.head.appendChild(link)
   }
-
+  // Load Leaflet JS
   if (!window.L) {
     await new Promise((resolve, reject) => {
-      const script = document.createElement('script')
-      script.src   = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
-      script.onload  = resolve
-      script.onerror = reject
-      document.head.appendChild(script)
+      const s = document.createElement('script')
+      s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+      s.onload = resolve; s.onerror = reject
+      document.head.appendChild(s)
     })
   }
 
-  const L    = window.L
+  const L = window.L
   const { lat, lng } = mapCoords.value
 
-  // Destroy existing map instance if re-initializing
-  if (leafletMap) {
-    leafletMap.remove()
-    leafletMap = null
+  if (leafletMap) { leafletMap.remove(); leafletMap = null }
+
+  leafletMap = L.map('case-map', { zoomControl: true }).setView([lat, lng], 16)
+
+  // ── Tile layers ───────────────────────────────────────────
+  const tileLayers = {
+    street: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
+    }),
+    satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: '© <a href="https://www.esri.com">Esri</a> World Imagery',
+      maxZoom: 19,
+    }),
+    topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://opentopomap.org">OpenTopoMap</a>',
+      maxZoom: 17,
+    }),
+    hybrid: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+      attribution: '© <a href="https://www.esri.com">Esri</a>',
+      maxZoom: 19,
+    }),
   }
 
-  leafletMap = L.map('case-map').setView([lat, lng], 15)
+  // Add active layer
+  tileLayers[activeMapLayer.value].addTo(leafletMap)
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    maxZoom: 19,
-  }).addTo(leafletMap)
-
-  // Custom branded pin
+  // ── Custom pin ───────────────────────────────────────────
   const icon = L.divIcon({
     className: '',
     html: `<div style="
@@ -856,11 +890,11 @@ async function initMap() {
       border:3px solid white;
       border-radius:50% 50% 50% 0;
       transform:rotate(-45deg);
-      box-shadow:0 2px 8px rgba(0,0,0,0.3);
+      box-shadow:0 3px 10px rgba(0,0,0,0.35);
     "></div>`,
     iconSize: [36, 36],
     iconAnchor: [18, 36],
-    popupAnchor: [0, -36],
+    popupAnchor: [0, -40],
   })
 
   const clientName = caseData.value
@@ -870,12 +904,26 @@ async function initMap() {
   L.marker([lat, lng], { icon })
     .addTo(leafletMap)
     .bindPopup(`
-      <div style="font-family:sans-serif;min-width:160px">
-        <p style="font-weight:700;font-size:13px;margin:0 0 4px">${clientName}</p>
-        <p style="font-size:11px;color:#666;margin:0">${presentAddressStr.value}</p>
+      <div style="font-family:sans-serif;min-width:180px;padding:2px 0">
+        <p style="font-weight:700;font-size:13px;margin:0 0 4px;color:#1a1a2e">${clientName}</p>
+        <p style="font-size:11px;color:#666;margin:0;line-height:1.4">${presentAddressStr.value}</p>
+        <p style="font-size:10px;color:#999;margin:6px 0 0;font-family:monospace">${lat.toFixed(5)}, ${lng.toFixed(5)}</p>
       </div>
-    `)
+    `, { maxWidth: 260 })
     .openPopup()
+
+  // ── Layer switcher (store reference for switching) ────────
+  leafletMap._tileLayers = tileLayers
+}
+
+async function switchMapLayer(layerId) {
+  activeMapLayer.value = layerId
+  if (!leafletMap || !leafletMap._tileLayers) return
+  // Remove all layers then add selected
+  Object.values(leafletMap._tileLayers).forEach(l => {
+    if (leafletMap.hasLayer(l)) leafletMap.removeLayer(l)
+  })
+  leafletMap._tileLayers[layerId].addTo(leafletMap)
 }
 
 </script>
