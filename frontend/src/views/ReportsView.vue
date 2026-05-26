@@ -66,13 +66,13 @@
 
         <!-- Date from -->
         <div>
-          <label class="block text-xs font-semibold text-gray-500 mb-1.5">Date intake — from</label>
+          <label class="block text-xs font-semibold text-gray-500 mb-1.5">Date intake - from</label>
           <input v-model="filters.dateFrom" type="date" class="input-base" />
         </div>
 
         <!-- Date to -->
         <div>
-          <label class="block text-xs font-semibold text-gray-500 mb-1.5">Date intake — to</label>
+          <label class="block text-xs font-semibold text-gray-500 mb-1.5">Date intake - to</label>
           <input v-model="filters.dateTo" type="date" class="input-base" />
         </div>
 
@@ -218,9 +218,9 @@
                 <td class="px-4 py-3 font-medium text-gray-900">
                   {{ c.client_last }}, {{ c.client_first }} {{ c.client_mi }}
                 </td>
-                <td class="px-4 py-3 text-gray-600 text-xs">{{ c.region || '—' }}</td>
-                <td class="px-4 py-3 text-gray-600 text-xs">{{ c.province || '—' }}</td>
-                <td class="px-4 py-3 text-gray-600 text-xs">{{ c.cefmu_type || '—' }}</td>
+                <td class="px-4 py-3 text-gray-600 text-xs">{{ c.region || '-' }}</td>
+                <td class="px-4 py-3 text-gray-600 text-xs">{{ c.province || '-' }}</td>
+                <td class="px-4 py-3 text-gray-600 text-xs">{{ c.cefmu_type || '-' }}</td>
                 <td class="px-4 py-3 text-gray-500 text-xs">{{ fmtDate(c.date_intake) }}</td>
                 <td class="px-4 py-3">
                   <span class="badge capitalize"
@@ -344,7 +344,7 @@ const byCefmuType = computed(() => {
 })
 
 function fmtDate(d) {
-  if (!d) return '—'
+  if (!d) return '-'
   return new Date(d).toLocaleDateString('en-PH', { dateStyle: 'medium' })
 }
 
@@ -385,7 +385,7 @@ function exportCSV() {
 function exportSummaryCSV() {
   const now = new Date().toLocaleDateString('en-PH', { dateStyle: 'long' })
   const rows = [
-    ['CEFMU Registry — Summary Report'],
+    ['CEFMU Registry - Summary Report'],
     [`Generated: ${now}`],
     [`Filters: Region=${filters.value.region||'All'}, Province=${filters.value.province||'All'}, Status=${filters.value.status||'All'}`],
     [],
