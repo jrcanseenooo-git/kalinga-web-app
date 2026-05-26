@@ -143,21 +143,48 @@
             </div>
           </div>
 
-          <!-- Map tab -->
-          <div v-if="activeTab === 'map'" class="animate-fade-in">
+          <!-- Map tab — v-show keeps DOM alive so map persists across tab switches -->
+          <div v-show="activeTab === 'map'" class="animate-fade-in">
             <div class="space-y-3">
-              <!-- Address being mapped -->
+
+              <!-- Top bar: address + action buttons -->
               <div class="flex items-start justify-between gap-4">
-                <div>
-                  <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Geocoding address</p>
-                  <p class="text-sm text-gray-700">{{ presentAddressStr || 'No address available' }}</p>
+                <div class="min-w-0">
+                  <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Geocoded from address</p>
+                  <p class="text-sm text-gray-700 leading-relaxed">{{ presentAddressStr || 'No address available' }}</p>
                 </div>
-                <button @click="geocodeAddress"
-                  :disabled="mapLoading"
-                  class="btn-secondary text-xs py-1.5 flex-shrink-0">
-                  <span v-if="mapLoading" class="w-3 h-3 border-2 border-gray-300 border-t-brand-500 rounded-full animate-spin"></span>
-                  {{ mapLoading ? 'Locating…' : '🔄 Re-locate' }}
-                </button>
+                <div class="flex gap-2 flex-shrink-0">
+                  <button @click="geocodeAddress" :disabled="mapLoading"
+                    class="btn-secondary text-xs py-1.5">
+                    <span v-if="mapLoading" class="w-3 h-3 border-2 border-gray-300 border-t-brand-500 rounded-full animate-spin"></span>
+                    {{ mapLoading ? 'Locating…' : '🔄 Re-geocode' }}
+                  </button>
+                  <button v-if="pinMoved && auth.canEdit" @click="saveCoords" :disabled="savingCoords"
+                    class="btn-primary text-xs py-1.5">
+                    <span v-if="savingCoords" class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                    {{ savingCoords ? 'Saving…' : '💾 Save location' }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Drag instruction banner -->
+              <div v-if="mapCoords && auth.canEdit"
+                class="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2">
+                <span class="text-base">📌</span>
+                <p class="text-xs text-blue-700 leading-relaxed">
+                  <strong>Drag the pin</strong> to the exact location of the client's residence. Click <strong>Save location</strong> to record the corrected coordinates.
+                </p>
+                <span v-if="pinMoved" class="ml-auto text-xs font-bold text-brand-600 whitespace-nowrap">Pin moved ✓</span>
+              </div>
+
+              <!-- Saved coords indicator -->
+              <div v-if="caseData.latitude && caseData.longitude && !pinMoved"
+                class="flex items-center gap-2 bg-green-50 border border-green-100 rounded-xl px-3 py-2">
+                <span class="text-base">✅</span>
+                <p class="text-xs text-green-700">
+                  Coordinates manually verified and saved:
+                  <strong class="font-mono">{{ Number(caseData.latitude).toFixed(5) }}, {{ Number(caseData.longitude).toFixed(5) }}</strong>
+                </p>
               </div>
 
               <!-- Map error -->
@@ -169,7 +196,7 @@
               <!-- Leaflet map container -->
               <div v-if="mapCoords"
                 class="rounded-2xl overflow-hidden border border-gray-100 shadow-sm relative"
-                style="height: 420px;">
+                style="height: 460px;">
                 <div id="case-map" style="height: 100%; width: 100%;"></div>
 
                 <!-- Layer switcher -->
@@ -184,9 +211,10 @@
                   </button>
                 </div>
 
-                <!-- Coords badge -->
-                <div class="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-lg px-2.5 py-1.5 text-xs font-mono text-gray-600 shadow-sm z-[999]">
-                  {{ mapCoords.lat.toFixed(5) }}, {{ mapCoords.lng.toFixed(5) }}
+                <!-- Live coords badge -->
+                <div class="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-lg px-2.5 py-1.5 text-xs font-mono text-gray-600 shadow-sm z-[999] flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full" :class="pinMoved ? 'bg-brand-500' : 'bg-gray-400'"></span>
+                  {{ mapCoords.lat.toFixed(6) }}, {{ mapCoords.lng.toFixed(6) }}
                 </div>
               </div>
 
@@ -196,7 +224,7 @@
                 <span class="text-4xl">🗺️</span>
                 <div class="text-center">
                   <p class="text-sm font-semibold text-gray-500">Map not loaded yet</p>
-                  <p class="text-xs text-gray-400 mt-1">Click the button above to locate this address</p>
+                  <p class="text-xs text-gray-400 mt-1">Click Re-geocode to locate this address on the map</p>
                 </div>
                 <button @click="geocodeAddress" class="btn-primary text-xs py-2">
                   📍 Locate on map
@@ -773,10 +801,12 @@ async function doSubmitNote() {
 }
 
 // ── Map / Geocoding ───────────────────────────────────────────
-const mapCoords  = ref(null)
-const mapLoading = ref(false)
-const mapError   = ref(null)
-let   leafletMap = null
+const mapCoords    = ref(null)
+const mapLoading   = ref(false)
+const mapError     = ref(null)
+const pinMoved     = ref(false)
+const savingCoords = ref(false)
+let   leafletMap   = null
 
 const presentAddressStr = computed(() => {
   if (!caseData.value) return ''
@@ -789,11 +819,29 @@ const presentAddressStr = computed(() => {
   ].filter(v => v && String(v).trim()).join(', ')
 })
 
-// Auto-geocode when user switches to map tab
-watch(activeTab, (tab) => {
-  if (tab === 'map' && !mapCoords.value && !mapLoading.value) {
-    geocodeAddress()
+// Auto-load map when switching to map tab
+watch(activeTab, async (tab) => {
+  if (tab !== 'map') return
+  await nextTick()
+  if (mapCoords.value) {
+    // Coords exist — just re-init the map (DOM may have been hidden/shown)
+    initMap()
+    return
   }
+  if (mapLoading.value) return
+  // Use saved coordinates if available (more accurate than geocoding)
+  if (caseData.value?.latitude && caseData.value?.longitude) {
+    const lat = parseFloat(caseData.value.latitude)
+    const lng = parseFloat(caseData.value.longitude)
+    if (!isNaN(lat) && !isNaN(lng)) {
+      mapCoords.value = { lat, lng }
+      await nextTick()
+      initMap()
+      return
+    }
+  }
+  // Otherwise geocode from address
+  geocodeAddress()
 })
 
 async function geocodeAddress() {
@@ -815,6 +863,7 @@ async function geocodeAddress() {
       return
     }
     mapCoords.value = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }
+    pinMoved.value  = false
     await nextTick()
     initMap()
   } catch (e) {
@@ -831,6 +880,37 @@ const mapLayers = [
   { id: 'hybrid',    label: '🏙️ Hybrid' },
 ]
 const activeMapLayer = ref('street')
+
+async function saveCoords() {
+  if (!mapCoords.value || !auth.canEdit) return
+  savingCoords.value = true
+  try {
+    await apiPost('updateCase', {
+      case_id:   caseData.value.case_id,
+      latitude:  String(mapCoords.value.lat),
+      longitude: String(mapCoords.value.lng),
+    })
+    // Update local caseData so the saved indicator shows
+    caseData.value.latitude  = mapCoords.value.lat
+    caseData.value.longitude = mapCoords.value.lng
+    pinMoved.value = false
+    // Update popup to confirmed
+    if (leafletMap && leafletMap._marker) {
+      const clientName = `${caseData.value.client_last}, ${caseData.value.client_first}`
+      leafletMap._marker.setPopupContent(`
+        <div style="font-family:sans-serif;min-width:180px;padding:2px 0">
+          <p style="font-weight:700;font-size:13px;margin:0 0 4px;color:#1a1a2e">${clientName}</p>
+          <p style="font-size:11px;color:#28a745;margin:0;font-weight:600">✅ Location saved</p>
+          <p style="font-size:10px;color:#999;margin:6px 0 0;font-family:monospace">${mapCoords.value.lat.toFixed(6)}, ${mapCoords.value.lng.toFixed(6)}</p>
+        </div>
+      `, { maxWidth: 260 }).openPopup()
+    }
+  } catch (e) {
+    console.error('Save coords failed:', e)
+  } finally {
+    savingCoords.value = false
+  }
+}
 
 async function initMap() {
   // Load Leaflet CSS
@@ -901,16 +981,41 @@ async function initMap() {
     ? `${caseData.value.client_last}, ${caseData.value.client_first}`
     : 'Client location'
 
-  L.marker([lat, lng], { icon })
+  // ── Draggable marker ──────────────────────────────────────
+  const marker = L.marker([lat, lng], { icon, draggable: true })
     .addTo(leafletMap)
     .bindPopup(`
       <div style="font-family:sans-serif;min-width:180px;padding:2px 0">
         <p style="font-weight:700;font-size:13px;margin:0 0 4px;color:#1a1a2e">${clientName}</p>
         <p style="font-size:11px;color:#666;margin:0;line-height:1.4">${presentAddressStr.value}</p>
-        <p style="font-size:10px;color:#999;margin:6px 0 0;font-family:monospace">${lat.toFixed(5)}, ${lng.toFixed(5)}</p>
+        <p style="font-size:10px;color:#999;margin:6px 0 0;font-family:monospace">Drag pin to exact location</p>
       </div>
     `, { maxWidth: 260 })
     .openPopup()
+
+  // Update coords live as user drags
+  marker.on('drag', (e) => {
+    const pos = e.target.getLatLng()
+    mapCoords.value = { lat: pos.lat, lng: pos.lng }
+  })
+
+  // On drag end — mark as moved and update popup
+  marker.on('dragend', (e) => {
+    const pos = e.target.getLatLng()
+    mapCoords.value = { lat: pos.lat, lng: pos.lng }
+    pinMoved.value = true
+    marker.setPopupContent(`
+      <div style="font-family:sans-serif;min-width:180px;padding:2px 0">
+        <p style="font-weight:700;font-size:13px;margin:0 0 4px;color:#1a1a2e">${clientName}</p>
+        <p style="font-size:11px;color:#28a745;margin:0;font-weight:600">📌 Pin repositioned</p>
+        <p style="font-size:10px;color:#999;margin:6px 0 0;font-family:monospace">${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)}</p>
+        <p style="font-size:10px;color:#666;margin:4px 0 0">Click "Save location" to record</p>
+      </div>
+    `, { maxWidth: 260 }).openPopup()
+  })
+
+  // Store marker reference for later
+  leafletMap._marker = marker
 
   // ── Layer switcher (store reference for switching) ────────
   leafletMap._tileLayers = tileLayers
