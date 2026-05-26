@@ -238,10 +238,10 @@
                     class="text-red-400">*</span></label>
                 <select v-model="noteForm.note_type" class="input-base text-sm">
                   <option value="">— Select type —</option>
-                  <option value="progress">📝 Progress Note</option>
-                  <option value="referral">🔀 MDT Referral / Transfer</option>
-                  <option value="follow_up">🔔 Follow-up</option>
-                  <option value="closure">✅ Closure Note</option>
+                  <option value="progress">Progress Note</option>
+                  <option value="referral">MDT Referral / Transfer</option>
+                  <option value="follow_up">Follow-up</option>
+                  <option value="closure">Closure Note</option>
                 </select>
               </div>
               <!-- Date -->
