@@ -37,7 +37,7 @@
                 complete national picture. No personally identifiable information is displayed.</span>
             </div>
           </div>
-          <!-- FAQ CTA — visible to new visitors right in the hero -->
+          <!-- FAQ CTA - visible to new visitors right in the hero -->
           <RouterLink to="/faq"
             class="flex-shrink-0 flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/25 hover:border-white/50 text-white rounded-xl px-4 py-2.5 text-sm font-semibold transition-all backdrop-blur-sm">
             <QuestionMarkCircleIcon class="w-4 h-4" />
@@ -312,7 +312,7 @@ function filterParams() {
 
 // ── Last-updated label ────────────────────────────────────────
 const lastUpdatedLabel = computed(() => {
-  if (!lastUpdatedAt.value) return '—'
+  if (!lastUpdatedAt.value) return '-'
   const secs = Math.floor((Date.now() - lastUpdatedAt.value) / 1000)
   if (secs < 10) return 'just now'
   if (secs < 60) return `${secs}s ago`
