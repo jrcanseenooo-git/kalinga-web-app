@@ -11,7 +11,7 @@
       :class="disabled ? 'bg-gray-50 text-gray-400 cursor-not-allowed' : ''"
       @change="$emit('update:modelValue', $event.target.value)"
     >
-      <option value="">{{ placeholder || '— Select —' }}</option>
+      <option value="">{{ placeholder || '- Select -' }}</option>
       <option v-for="opt in options" :key="optValue(opt)" :value="optValue(opt)">
         {{ optLabel(opt) }}
       </option>
