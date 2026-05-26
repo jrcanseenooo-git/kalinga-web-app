@@ -44,7 +44,7 @@
         <!-- Classification + Sex -->
         <div class="grid grid-cols-2 gap-4">
           <div class="card p-5">
-            <h3 class="text-sm font-bold text-gray-800 mb-3">By classification</h3>
+            <h3 class="text-sm font-bold text-gray-800 mb-3">By CEFMU classification</h3>
             <div v-if="!classChartData" class="h-40 bg-gray-50 rounded-xl animate-pulse-soft"></div>
             <div v-else class="h-40">
               <Doughnut :data="classChartData" :options="doughnutOptions" class="w-full h-full" />
