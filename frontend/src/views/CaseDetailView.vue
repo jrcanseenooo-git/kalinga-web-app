@@ -46,9 +46,9 @@
           <ChevronLeftIcon class="w-4 h-4" /> Back to Cases
         </RouterLink>
         <div class="flex gap-2">
-          <button @click="printCase" class="btn-secondary text-xs py-2">
+          <!-- <button @click="printCase" class="btn-secondary text-xs py-2">
             <PrinterIcon class="w-3.5 h-3.5" /> Print
-          </button>
+          </button> -->
           <RouterLink :to="`/cases/${caseData.case_id}/edit`" class="btn-primary text-xs py-2">
             <PencilIcon class="w-3.5 h-3.5" /> Edit Case
           </RouterLink>
@@ -139,6 +139,55 @@
                     [caseData.prov_street, caseData.prov_barangay, caseData.prov_city_muni, caseData.prov_province,
                     caseData.prov_region].filter(v => v && String(v).trim()).join(', ') || '—'}}
                 </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Map tab -->
+          <div v-if="activeTab === 'map'" class="animate-fade-in">
+            <div class="space-y-3">
+              <!-- Address being mapped -->
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Geocoding address</p>
+                  <p class="text-sm text-gray-700">{{ presentAddressStr || 'No address available' }}</p>
+                </div>
+                <button @click="geocodeAddress"
+                  :disabled="mapLoading"
+                  class="btn-secondary text-xs py-1.5 flex-shrink-0">
+                  <span v-if="mapLoading" class="w-3 h-3 border-2 border-gray-300 border-t-brand-500 rounded-full animate-spin"></span>
+                  {{ mapLoading ? 'Locating…' : '🔄 Re-locate' }}
+                </button>
+              </div>
+
+              <!-- Map error -->
+              <div v-if="mapError" class="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
+                <span class="text-amber-500 text-sm">⚠</span>
+                <p class="text-xs text-amber-700">{{ mapError }}</p>
+              </div>
+
+              <!-- Leaflet map container -->
+              <div v-if="mapCoords"
+                class="rounded-2xl overflow-hidden border border-gray-100 shadow-sm relative"
+                style="height: 380px;">
+                <div id="case-map" style="height: 100%; width: 100%;"></div>
+                <!-- Coords badge -->
+                <div class="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-lg px-2.5 py-1.5 text-xs font-mono text-gray-600 shadow-sm z-[999]">
+                  {{ mapCoords.lat.toFixed(5) }}, {{ mapCoords.lng.toFixed(5) }}
+                </div>
+              </div>
+
+              <!-- Not yet geocoded -->
+              <div v-else-if="!mapLoading && !mapError"
+                class="h-64 bg-gray-50 rounded-2xl border border-dashed border-gray-200 flex flex-col items-center justify-center gap-3">
+                <span class="text-4xl">🗺️</span>
+                <div class="text-center">
+                  <p class="text-sm font-semibold text-gray-500">Map not loaded yet</p>
+                  <p class="text-xs text-gray-400 mt-1">Click the button above to locate this address</p>
+                </div>
+                <button @click="geocodeAddress" class="btn-primary text-xs py-2">
+                  📍 Locate on map
+                </button>
               </div>
             </div>
           </div>
@@ -511,7 +560,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { api, apiPost } from '@/services/api'
@@ -534,8 +583,9 @@ const activeTab = ref('personal')
 
 const detailTabs = [
   { id: 'personal', label: '👤 Personal' },
-  { id: 'address', label: '📍 Address' },
-  { id: 'family', label: '👨‍👩‍👧 Family' },
+  { id: 'address',  label: '📍 Address' },
+  { id: 'family',   label: '👨‍👩‍👧 Family' },
+  { id: 'map',      label: '🗺️ Map' },
 ]
 
 // ── Services ──────────────────────────────────────────────────
@@ -708,6 +758,126 @@ async function doSubmitNote() {
     savingNote.value = false
   }
 }
+
+// ── Map / Geocoding ───────────────────────────────────────────
+const mapCoords  = ref(null)
+const mapLoading = ref(false)
+const mapError   = ref(null)
+let   leafletMap = null
+
+const presentAddressStr = computed(() => {
+  if (!caseData.value) return ''
+  return [
+    caseData.value.barangay,
+    caseData.value.city_muni,
+    caseData.value.province,
+    caseData.value.region,
+    'Philippines',
+  ].filter(v => v && String(v).trim()).join(', ')
+})
+
+// Auto-geocode when user switches to map tab
+watch(activeTab, (tab) => {
+  if (tab === 'map' && !mapCoords.value && !mapLoading.value) {
+    geocodeAddress()
+  }
+})
+
+async function geocodeAddress() {
+  if (!presentAddressStr.value) {
+    mapError.value = 'No address information available for this case.'
+    return
+  }
+  mapLoading.value = true
+  mapError.value   = null
+  try {
+    const q   = encodeURIComponent(presentAddressStr.value)
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&countrycodes=ph`,
+      { headers: { 'Accept-Language': 'en' } }
+    )
+    const data = await res.json()
+    if (!data.length) {
+      mapError.value = `Could not locate "${presentAddressStr.value}". Try a less specific address.`
+      return
+    }
+    mapCoords.value = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }
+    await nextTick()
+    initMap()
+  } catch (e) {
+    mapError.value = 'Geocoding failed. Check your internet connection and try again.'
+  } finally {
+    mapLoading.value = false
+  }
+}
+
+async function initMap() {
+  // Dynamically load Leaflet CSS + JS (no npm install needed)
+  if (!document.getElementById('leaflet-css')) {
+    const link = document.createElement('link')
+    link.id    = 'leaflet-css'
+    link.rel   = 'stylesheet'
+    link.href  = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+    document.head.appendChild(link)
+  }
+
+  if (!window.L) {
+    await new Promise((resolve, reject) => {
+      const script = document.createElement('script')
+      script.src   = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+      script.onload  = resolve
+      script.onerror = reject
+      document.head.appendChild(script)
+    })
+  }
+
+  const L    = window.L
+  const { lat, lng } = mapCoords.value
+
+  // Destroy existing map instance if re-initializing
+  if (leafletMap) {
+    leafletMap.remove()
+    leafletMap = null
+  }
+
+  leafletMap = L.map('case-map').setView([lat, lng], 15)
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19,
+  }).addTo(leafletMap)
+
+  // Custom branded pin
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="
+      width:36px;height:36px;
+      background:#6b4aab;
+      border:3px solid white;
+      border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg);
+      box-shadow:0 2px 8px rgba(0,0,0,0.3);
+    "></div>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 36],
+    popupAnchor: [0, -36],
+  })
+
+  const clientName = caseData.value
+    ? `${caseData.value.client_last}, ${caseData.value.client_first}`
+    : 'Client location'
+
+  L.marker([lat, lng], { icon })
+    .addTo(leafletMap)
+    .bindPopup(`
+      <div style="font-family:sans-serif;min-width:160px">
+        <p style="font-weight:700;font-size:13px;margin:0 0 4px">${clientName}</p>
+        <p style="font-size:11px;color:#666;margin:0">${presentAddressStr.value}</p>
+      </div>
+    `)
+    .openPopup()
+}
+
 </script>
 
 <style scoped>
