@@ -384,8 +384,7 @@
                 </p>
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-xs font-semibold text-gray-500 mb-1.5">Referred to (MDT member /
-                      agency)</label>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1.5">Referred to (MDT member / agency)</label>
                     <select v-model="noteForm.referred_to" class="input-base text-sm">
                       <option value="">— Select MDT member —</option>
                       <optgroup label="Internal MDT">
@@ -424,6 +423,44 @@
                       <option value="Other">Other</option>
                     </select>
                   </div>
+                </div>
+
+                <!-- LGU Transfer fields — shown when referred to LGU-SWDO or transferring -->
+                <div v-if="noteForm.referred_to === 'LGU - SWDO' || noteForm.referral_purpose === 'Shelter / temporary placement'"
+                  class="bg-white border border-blue-200 rounded-xl p-3 space-y-3">
+                  <p class="text-xs font-bold text-blue-600">📍 LGU Transfer — new location details</p>
+                  <div class="grid grid-cols-3 gap-2">
+                    <div>
+                      <label class="block text-xs font-semibold text-gray-500 mb-1">Region</label>
+                      <input v-model="noteForm.transfer_region" class="input-base text-xs" placeholder="e.g. Region IX" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-semibold text-gray-500 mb-1">Province</label>
+                      <input v-model="noteForm.transfer_province" class="input-base text-xs" placeholder="e.g. Zamboanga del Norte" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-semibold text-gray-500 mb-1">City / Municipality</label>
+                      <input v-model="noteForm.transfer_lgu" class="input-base text-xs" placeholder="e.g. Dapitan City" />
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <input type="checkbox" id="autoUpdateMap" v-model="noteForm.auto_update_map" class="rounded" />
+                    <label for="autoUpdateMap" class="text-xs text-blue-700 font-semibold cursor-pointer">
+                      🗺️ Auto-update geo map location after saving this note
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Specific detail field based on purpose -->
+                <div v-if="noteForm.referral_purpose">
+                  <label class="block text-xs font-semibold text-gray-500 mb-1.5">
+                    Specific details
+                    <span class="text-gray-400 font-normal">
+                      ({{ specificDetailLabel }})
+                    </span>
+                  </label>
+                  <input v-model="noteForm.specific_detail" class="input-base text-sm"
+                    :placeholder="specificDetailPlaceholder" />
                 </div>
               </div>
             </Transition>
@@ -591,9 +628,24 @@
               <XMarkIcon class="w-5 h-5" />
             </button>
           </div>
-          <SelectField label="Service type" v-model="svcForm.service_type"
-            :options="['Medical', 'Financial', 'Funeral', 'Transportation', 'Legal', 'Psychosocial', 'Educational', 'Other']"
-            required />
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Service type <span class="text-red-400">*</span></label>
+            <select v-model="svcForm.service_type" class="input-base">
+              <option value="">— Select —</option>
+              <option value="Medical">Medical</option>
+              <option value="Financial">Financial</option>
+              <option value="Funeral">Funeral</option>
+              <option value="Transportation">Transportation</option>
+              <option value="Legal">Legal</option>
+              <option value="Psychosocial">Psychosocial</option>
+              <option value="Educational">Educational</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div v-if="svcForm.service_type">
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">{{ svcSpecificLabel }}</label>
+            <input v-model="svcForm.specific_detail" class="input-base text-sm" :placeholder="svcSpecificPlaceholder" />
+          </div>
           <FormField label="Amount (₱)" v-model="svcForm.amount" type="number" />
           <FormField label="Date provided" v-model="svcForm.date_provided" type="date" />
           <div class="flex gap-3 pt-2">
@@ -734,7 +786,7 @@ const detailTabs = [
 // ── Services ──────────────────────────────────────────────────
 const showServiceForm = ref(false)
 const savingSvc = ref(false)
-const svcForm = ref({ service_type: '', amount: '', date_provided: '' })
+const svcForm = ref({ service_type: '', amount: '', date_provided: '', specific_detail: '' })
 
 // ── Progress notes / MDT ─────────────────────────────────────
 const showNoteForm = ref(false)
@@ -749,6 +801,11 @@ const emptyNote = () => ({
   next_steps: '',
   referred_to: '',
   referral_purpose: '',
+  specific_detail: '',
+  transfer_region: '',
+  transfer_province: '',
+  transfer_lgu: '',
+  auto_update_map: false,
 })
 const noteForm = ref(emptyNote())
 
@@ -852,11 +909,18 @@ async function doSubmitService() {
   if (!svcForm.value.service_type) return
   savingSvc.value = true
   try {
-    await apiPost('addService', { case_id: route.params.id, ...svcForm.value })
+    await apiPost('addService', {
+      case_id:      route.params.id,
+      service_type: svcForm.value.specific_detail
+        ? `${svcForm.value.service_type} — ${svcForm.value.specific_detail}`
+        : svcForm.value.service_type,
+      amount:       svcForm.value.amount,
+      date_provided: svcForm.value.date_provided,
+    })
     caseData.value = await api('getCase', { case_id: route.params.id })
     showServiceConfirm.value = false
     showServiceForm.value = false
-    svcForm.value = { service_type: '', amount: '', date_provided: '' }
+    svcForm.value = { service_type: '', amount: '', date_provided: '', specific_detail: '' }
   } finally { savingSvc.value = false }
 }
 
@@ -891,6 +955,32 @@ async function doSubmitNote() {
       await apiPost('addNote', payload)
     }
     caseData.value = await api('getCase', { case_id: route.params.id })
+    // If LGU transfer with auto-update map checked, trigger geocoding of new location
+    if (noteForm.value.auto_update_map && noteForm.value.transfer_lgu) {
+      const newAddr = [noteForm.value.transfer_lgu, noteForm.value.transfer_province, noteForm.value.transfer_region, 'Philippines'].filter(Boolean).join(', ')
+      try {
+        const q = encodeURIComponent(newAddr)
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&countrycodes=ph`, { headers: { 'Accept-Language': 'en' } })
+        const data = await res.json()
+        if (data.length) {
+          const lat = parseFloat(data[0].lat)
+          const lng = parseFloat(data[0].lon)
+          // Save to case_locations sheet
+          await apiPost('saveLocation', {
+            case_id:           route.params.id,
+            latitude:          String(lat),
+            longitude:         String(lng),
+            current_lgu:       noteForm.value.transfer_lgu,
+            current_province:  noteForm.value.transfer_province,
+            current_region:    noteForm.value.transfer_region,
+            transfer_reason:   'Transferred to another LGU (from MDT note)',
+          })
+          mapCoords.value = { lat, lng }
+          await loadLocationHistory()
+          if (activeTab.value === 'map') initMap()
+        }
+      } catch (e) { console.error('Auto geo-update failed:', e) }
+    }
     showNoteConfirm.value = false
     showNoteForm.value = false
     resetNoteForm()
@@ -981,6 +1071,62 @@ async function geocodeAddress() {
     mapLoading.value = false
   }
 }
+
+const svcSpecificLabel = computed(() => {
+  const map = {
+    'Medical':        'Type of medical service',
+    'Financial':      'Type of financial assistance',
+    'Funeral':        'Funeral assistance details',
+    'Transportation': 'Transportation details',
+    'Legal':          'Type of legal service',
+    'Psychosocial':   'Type of psychosocial intervention',
+    'Educational':    'Type of educational support',
+    'Other':          'Specify service',
+  }
+  return map[svcForm.value.service_type] || 'Specific details'
+})
+
+const svcSpecificPlaceholder = computed(() => {
+  const map = {
+    'Medical':        'e.g. Medical check-up, laboratory tests, medicine, hospitalization…',
+    'Financial':      'e.g. Emergency cash assistance ₱5,000, AICS, transportation allowance…',
+    'Funeral':        'e.g. Funeral assistance for family member, burial package…',
+    'Transportation': 'e.g. Bus fare to Zamboanga City, ambulance service…',
+    'Legal':          'e.g. Filing of complaint, legal consultation, court representation…',
+    'Psychosocial':   'e.g. Individual counseling, crisis intervention, play therapy…',
+    'Educational':    'e.g. School supplies, ALS enrollment, uniform assistance…',
+    'Other':          'Describe the service provided…',
+  }
+  return map[svcForm.value.service_type] || 'Provide specific details…'
+})
+
+const specificDetailLabel = computed(() => {
+  const map = {
+    'Medical assistance':        'Type of medical assistance',
+    'Legal assistance':          'Type of legal action',
+    'Psychosocial support':      'Type of psychosocial intervention',
+    'Livelihood / skills training': 'Specific program or training',
+    'Educational assistance':    'Type of educational support',
+    'Shelter / temporary placement': 'Name / location of shelter',
+    'Financial assistance':      'Type / amount of financial assistance',
+    'Law enforcement':           'Specific law enforcement action taken',
+  }
+  return map[noteForm.value.referral_purpose] || 'Additional details'
+})
+
+const specificDetailPlaceholder = computed(() => {
+  const map = {
+    'Medical assistance':        'e.g. Medical check-up, hospitalization, medicine support…',
+    'Legal assistance':          'e.g. Filing of complaint, restraining order, court hearing…',
+    'Psychosocial support':      'e.g. Individual counseling, group therapy, crisis debriefing…',
+    'Livelihood / skills training': 'e.g. TESDA NC II Dressmaking, DOLE Livelihood Program…',
+    'Educational assistance':    'e.g. ALS enrollment, school re-entry, tuition assistance…',
+    'Shelter / temporary placement': 'e.g. DSWD Residential Care Facility Zamboanga…',
+    'Financial assistance':      'e.g. Emergency cash assistance ₱5,000, AICS…',
+    'Law enforcement':           'e.g. Blotter filed at PNP Station 1, case referred to WCPD…',
+  }
+  return map[noteForm.value.referral_purpose] || 'Provide specific details…'
+})
 
 const mapLayers = [
   { id: 'street',    label: '🗺️ Street' },
