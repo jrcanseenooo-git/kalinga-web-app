@@ -170,7 +170,7 @@
               <td class="px-5 py-3.5">
                 <div class="flex items-center gap-3">
                   <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
-                    :class="c.classification?.toLowerCase() === 'child' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'">
+                    :class="classifyColor(c.classification)">
                     {{ c.client_first?.charAt(0) }}{{ c.client_last?.charAt(0) }}
                   </div>
                   <div>
@@ -187,9 +187,8 @@
               <td class="px-5 py-3.5 hidden md:table-cell">
                 <div class="space-y-1">
                   <span class="badge text-xs" :class="classColor(c.classification)">
-                    {{ c.classification || '—' }}
+                    {{ parseClassif(c.classification) }}
                   </span>
-                  <p class="text-xs text-gray-500">{{ c.cefmu_type || '—' }}</p>
                 </div>
               </td>
 
