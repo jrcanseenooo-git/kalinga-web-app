@@ -1,7 +1,7 @@
 <template>
   <div class="flex bg-white" style="height:100vh;overflow:hidden;width:100vw;">
 
-    <!-- Left panel — form -->
+    <!-- Left panel - form -->
     <div class="flex-shrink-0 flex flex-col justify-center px-12 overflow-y-auto bg-white"
       style="height:100vh;width:480px;min-width:480px;">
 
@@ -90,7 +90,7 @@
       </p>
     </div>
 
-    <!-- Right panel — visual -->
+    <!-- Right panel - visual -->
     <div class="flex flex-1 relative overflow-hidden" style="height:100vh;">
       <!-- Gradient background matching brand -->
       <div class="absolute inset-0 sidebar-bg"></div>
