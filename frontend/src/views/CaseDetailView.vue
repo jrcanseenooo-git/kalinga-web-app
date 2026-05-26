@@ -162,7 +162,7 @@
                   <button v-if="pinMoved && auth.canEdit" @click="saveCoords" :disabled="savingCoords"
                     class="btn-primary text-xs py-1.5">
                     <span v-if="savingCoords" class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                    {{ savingCoords ? 'Saving…' : '💾 Save location' }}
+                    {{ savingCoords ? 'Saving…' : '💾 Record location' }}
                   </button>
                 </div>
               </div>
@@ -216,6 +216,39 @@
                   <span class="w-2 h-2 rounded-full" :class="pinMoved ? 'bg-brand-500' : 'bg-gray-400'"></span>
                   {{ mapCoords.lat.toFixed(6) }}, {{ mapCoords.lng.toFixed(6) }}
                 </div>
+              </div>
+
+              <!-- Location history timeline -->
+              <div v-if="locationHistory.length" class="mt-4">
+                <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <span>📍 Location history</span>
+                  <span class="bg-brand-50 text-brand-600 text-xs font-bold px-2 py-0.5 rounded-full">{{ locationHistory.length }}</span>
+                </h4>
+                <div class="space-y-2">
+                  <div v-for="(loc, i) in locationHistory" :key="loc.location_id"
+                    class="flex items-start gap-3 p-3 rounded-xl border text-xs"
+                    :class="i === 0 ? 'border-brand-200 bg-brand-50' : 'border-gray-100 bg-gray-50'">
+                    <div class="flex-shrink-0 mt-0.5">
+                      <span v-if="i === 0" class="text-base">📍</span>
+                      <span v-else class="text-base">🔵</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center justify-between gap-2 mb-1">
+                        <span class="font-semibold text-gray-800">
+                          {{ loc.current_lgu || '—' }}, {{ loc.current_province || '—' }}
+                        </span>
+                        <span class="text-gray-400 flex-shrink-0">{{ fmtDate(loc.recorded_at) }}</span>
+                      </div>
+                      <p class="text-gray-500">{{ loc.transfer_reason }}</p>
+                      <p v-if="loc.current_address_notes" class="text-gray-400 mt-0.5">{{ loc.current_address_notes }}</p>
+                      <p class="text-gray-400 font-mono mt-1">{{ Number(loc.latitude).toFixed(5) }}, {{ Number(loc.longitude).toFixed(5) }}</p>
+                      <p class="text-gray-400 mt-0.5">By {{ loc.recorded_by }}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-else-if="!loadingLocations && mapCoords" class="mt-4 text-center py-4 bg-gray-50 rounded-xl">
+                <p class="text-xs text-gray-400">No location records yet. Drag the pin and click "Record location" to start tracking.</p>
               </div>
 
               <!-- Not yet geocoded -->
@@ -598,6 +631,75 @@
     message="You are about to record a service provided to this client. This will be reflected in the case history and reports."
     confirm-label="Yes, add service" :loading="savingSvc" @confirm="doSubmitService"
     @cancel="showServiceConfirm = false" />
+
+  <!-- Location record form modal -->
+  <Teleport to="body">
+    <Transition name="modal">
+      <div v-if="showLocationForm"
+        class="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4"
+        @click.self="showLocationForm = false">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="font-bold text-gray-900">Record client location</h3>
+              <p class="text-xs text-gray-500 mt-0.5">{{ mapCoords?.lat.toFixed(5) }}, {{ mapCoords?.lng.toFixed(5) }}</p>
+            </div>
+            <button @click="showLocationForm = false" class="text-gray-400 hover:text-gray-600">
+              <XMarkIcon class="w-5 h-5" />
+            </button>
+          </div>
+          <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
+            📌 Fill in the client's <strong>current location</strong> — where they are now, which may differ from their registered address.
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="col-span-2">
+              <label class="block text-xs font-semibold text-gray-500 mb-1">Current Region</label>
+              <input v-model="locationForm.current_region" class="input-base text-sm" placeholder="e.g. Region IX" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-500 mb-1">Current Province</label>
+              <input v-model="locationForm.current_province" class="input-base text-sm" placeholder="e.g. Zamboanga del Norte" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-500 mb-1">Current City/Municipality</label>
+              <input v-model="locationForm.current_lgu" class="input-base text-sm" placeholder="e.g. Dapitan City" />
+            </div>
+            <div class="col-span-2">
+              <label class="block text-xs font-semibold text-gray-500 mb-1">Barangay</label>
+              <input v-model="locationForm.current_barangay" class="input-base text-sm" placeholder="e.g. Banbanan" />
+            </div>
+            <div class="col-span-2">
+              <label class="block text-xs font-semibold text-gray-500 mb-1">Address notes <span class="text-gray-400">(optional)</span></label>
+              <input v-model="locationForm.current_address_notes" class="input-base text-sm" placeholder="e.g. Near school, Blue house" />
+            </div>
+            <div class="col-span-2">
+              <label class="block text-xs font-semibold text-gray-500 mb-1">Reason for update <span class="text-red-400">*</span></label>
+              <select v-model="locationForm.transfer_reason" class="input-base text-sm">
+                <option value="">— Select reason —</option>
+                <option value="Initial location record">Initial location record</option>
+                <option value="Transferred to another LGU">Transferred to another LGU</option>
+                <option value="Referred to another agency">Referred to another agency</option>
+                <option value="Client relocated">Client relocated</option>
+                <option value="Follow-up visit">Follow-up visit</option>
+                <option value="Rescue / emergency relocation">Rescue / emergency relocation</option>
+                <option value="Reintegration to family">Reintegration to family</option>
+                <option value="Shelter placement">Shelter placement</option>
+                <option value="Location correction">Location correction</option>
+              </select>
+            </div>
+          </div>
+          <div class="flex gap-3 pt-1">
+            <button @click="submitSaveCoords" :disabled="savingCoords || !locationForm.transfer_reason"
+              class="btn-primary flex-1 justify-center text-sm">
+              <span v-if="savingCoords" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              {{ savingCoords ? 'Saving…' : '📌 Save location record' }}
+            </button>
+            <button @click="showLocationForm = false" class="btn-secondary text-sm">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup>
@@ -844,6 +946,13 @@ watch(activeTab, async (tab) => {
   geocodeAddress()
 })
 
+// Load location history when map tab opens
+watch(activeTab, (tab) => {
+  if (tab === 'map' && locationHistory.value.length === 0) {
+    loadLocationHistory()
+  }
+})
+
 async function geocodeAddress() {
   if (!presentAddressStr.value) {
     mapError.value = 'No address information available for this case.'
@@ -881,32 +990,67 @@ const mapLayers = [
 ]
 const activeMapLayer = ref('street')
 
+// Location save form state
+const showLocationForm  = ref(false)
+const locationForm      = ref({ current_lgu: '', current_province: '', current_region: '', current_barangay: '', current_address_notes: '', transfer_reason: '' })
+const locationHistory   = ref([])
+const loadingLocations  = ref(false)
+
+async function loadLocationHistory() {
+  loadingLocations.value = true
+  try {
+    const locs = await api('getLocations', { case_id: caseData.value.case_id })
+    locationHistory.value = Array.isArray(locs) ? locs : []
+  } catch (e) { locationHistory.value = [] }
+  finally { loadingLocations.value = false }
+}
+
 async function saveCoords() {
   if (!mapCoords.value || !auth.canEdit) return
+  // Pre-fill form with case's current address
+  locationForm.value = {
+    current_lgu:           caseData.value.city_muni    || '',
+    current_province:      caseData.value.province     || '',
+    current_region:        caseData.value.region       || '',
+    current_barangay:      caseData.value.barangay     || '',
+    current_address_notes: '',
+    transfer_reason:       '',
+  }
+  showLocationForm.value = true
+}
+
+async function submitSaveCoords() {
   savingCoords.value = true
   try {
-    await apiPost('updateCase', {
-      case_id:   caseData.value.case_id,
-      latitude:  String(mapCoords.value.lat),
-      longitude: String(mapCoords.value.lng),
+    await apiPost('saveLocation', {
+      case_id:                caseData.value.case_id,
+      latitude:               String(mapCoords.value.lat),
+      longitude:              String(mapCoords.value.lng),
+      current_lgu:            locationForm.value.current_lgu,
+      current_province:       locationForm.value.current_province,
+      current_region:         locationForm.value.current_region,
+      current_barangay:       locationForm.value.current_barangay,
+      current_address_notes:  locationForm.value.current_address_notes,
+      transfer_reason:        locationForm.value.transfer_reason || 'Location update',
     })
-    // Update local caseData so the saved indicator shows
-    caseData.value.latitude  = mapCoords.value.lat
-    caseData.value.longitude = mapCoords.value.lng
     pinMoved.value = false
-    // Update popup to confirmed
+    showLocationForm.value = false
+    // Reload location history
+    await loadLocationHistory()
+    // Update popup
     if (leafletMap && leafletMap._marker) {
       const clientName = `${caseData.value.client_last}, ${caseData.value.client_first}`
       leafletMap._marker.setPopupContent(`
         <div style="font-family:sans-serif;min-width:180px;padding:2px 0">
           <p style="font-weight:700;font-size:13px;margin:0 0 4px;color:#1a1a2e">${clientName}</p>
-          <p style="font-size:11px;color:#28a745;margin:0;font-weight:600">✅ Location saved</p>
-          <p style="font-size:10px;color:#999;margin:6px 0 0;font-family:monospace">${mapCoords.value.lat.toFixed(6)}, ${mapCoords.value.lng.toFixed(6)}</p>
+          <p style="font-size:11px;color:#28a745;margin:0;font-weight:600">✅ Location recorded</p>
+          <p style="font-size:10px;color:#666;margin:4px 0 0">${locationForm.value.current_lgu}, ${locationForm.value.current_province}</p>
+          <p style="font-size:10px;color:#999;margin:4px 0 0;font-family:monospace">${mapCoords.value.lat.toFixed(6)}, ${mapCoords.value.lng.toFixed(6)}</p>
         </div>
       `, { maxWidth: 260 }).openPopup()
     }
   } catch (e) {
-    console.error('Save coords failed:', e)
+    console.error('Save location failed:', e)
   } finally {
     savingCoords.value = false
   }
