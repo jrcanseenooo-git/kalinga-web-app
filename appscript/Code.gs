@@ -126,6 +126,9 @@ function doGet(e) {
     case 'addService': return addService(params, user);
     case 'addNote': return addNote(params, user);
     case 'updateNote': return updateNote(params, user);
+    case 'saveLocation': return saveLocation(params, user);
+    case 'getLocations': return getLocations(e, user);
+    case 'getLatestLocation': return getLatestLocation(e, user);
     case 'createUser': return createUser(params, user);
     case 'updateUser': return updateUser(params, user);
     case 'toggleUser': return toggleUser(params, user);
