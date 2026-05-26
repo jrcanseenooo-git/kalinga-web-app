@@ -346,3 +346,121 @@ function updateNote(params, user) {
   try { CacheService.getScriptCache().remove('case_' + params.case_id + '_' + user.role); } catch(e) {}
   return _output({ updated: true });
 }
+// ── Case Locations Sheet ──────────────────────────────────────
+// Tracks client location history — each save creates a new record
+// so case workers and monitors can see movement across LGUs over time
+
+const LOCATION_SHEET = 'case_locations';
+const LOCATION_COLS  = [
+  'location_id',
+  'case_id',
+  // Client identity
+  'client_last', 'client_first', 'client_mi',
+  // Permanent address (from case record — doesn't change)
+  'perm_region', 'perm_province', 'perm_city_muni', 'perm_barangay',
+  // Current location (where the client actually is now)
+  'current_lgu', 'current_province', 'current_region', 'current_barangay',
+  'current_address_notes',
+  // Geo coordinates
+  'latitude', 'longitude',
+  // Who and when
+  'recorded_by', 'recorded_at',
+  // Why location changed
+  'transfer_reason',
+];
+
+function _ensureLocationSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName(LOCATION_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(LOCATION_SHEET);
+    sheet.getRange(1, 1, 1, LOCATION_COLS.length).setValues([LOCATION_COLS]);
+    sheet.getRange(1, 1, 1, LOCATION_COLS.length)
+      .setFontWeight('bold').setBackground('#4B2E8C').setFontColor('#ffffff');
+    sheet.setFrozenRows(1);
+    Logger.log('Created case_locations sheet');
+  }
+  return sheet;
+}
+
+// ── saveLocation — called when case worker drags and saves map pin ──
+function saveLocation(params, user) {
+  if (!['admin','case_worker','fo_user','lgu_supervisor'].includes(user.role)) {
+    return _error('Forbidden', 403);
+  }
+
+  // Get the case to fill in client details
+  const ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const cases = _sheetToObjectsSS(ss, CASE_SHEET);
+  const found = cases.find(c => c.case_id === params.case_id);
+  if (!found) return _error('Case not found', 404);
+
+  const sheet  = _ensureLocationSheet();
+  const now    = new Date().toISOString();
+  const loc_id = 'LOC-' + Utilities.getUuid().replace(/-/g,'').substr(0,8).toUpperCase();
+
+  // Permanent address fields — handle both prov_ and per_ prefixes
+  const permRegion   = found.per_region   || found.prov_region   || '';
+  const permProvince = found.per_province || found.prov_province || '';
+  const permCityMuni = found.per_city_muni|| found.prov_city_muni|| '';
+  const permBarangay = found.per_barangay || found.prov_barangay || '';
+
+  const row = LOCATION_COLS.map(col => {
+    switch (col) {
+      case 'location_id':          return loc_id;
+      case 'case_id':              return params.case_id;
+      case 'client_last':          return found.client_last  || '';
+      case 'client_first':         return found.client_first || '';
+      case 'client_mi':            return found.client_mi    || '';
+      case 'perm_region':          return permRegion;
+      case 'perm_province':        return permProvince;
+      case 'perm_city_muni':       return permCityMuni;
+      case 'perm_barangay':        return permBarangay;
+      case 'current_lgu':          return params.current_lgu          || found.city_muni || '';
+      case 'current_province':     return params.current_province     || found.province  || '';
+      case 'current_region':       return params.current_region       || found.region    || '';
+      case 'current_barangay':     return params.current_barangay     || found.barangay  || '';
+      case 'current_address_notes':return params.current_address_notes|| '';
+      case 'latitude':             return params.latitude  || '';
+      case 'longitude':            return params.longitude || '';
+      case 'recorded_by':          return user.email;
+      case 'recorded_at':          return now;
+      case 'transfer_reason':      return params.transfer_reason || 'Location update';
+      default:                     return '';
+    }
+  });
+
+  sheet.appendRow(row);
+  _logActivity(user.email, 'SAVE_LOCATION', params.case_id);
+  return _output({ location_id: loc_id, saved: true });
+}
+
+// ── getLocations — returns full location history for a case ──
+function getLocations(e, user) {
+  const case_id = e.parameter.case_id;
+  const sheet   = _getSheet(LOCATION_SHEET);
+  if (!sheet) return _output([]);
+
+  const locations = _sheetToObjects(sheet)
+    .filter(l => l.case_id === case_id)
+    .sort((a, b) => new Date(b.recorded_at) - new Date(a.recorded_at));
+
+  return _output(locations);
+}
+
+// ── getLatestLocation — returns only the most recent location ──
+function getLatestLocation(e, user) {
+  const case_id   = e.parameter.case_id;
+  const cacheKey  = 'loc_' + case_id;
+  const cached    = _cacheGet(cacheKey);
+  if (cached) return _output(cached);
+
+  const sheet = _getSheet(LOCATION_SHEET);
+  if (!sheet) return _output(null);
+
+  const all    = _sheetToObjects(sheet).filter(l => l.case_id === case_id);
+  const latest = all.sort((a, b) => new Date(b.recorded_at) - new Date(a.recorded_at))[0] || null;
+
+  if (latest) _cachePut(cacheKey, latest, 60);
+  return _output(latest);
+}
