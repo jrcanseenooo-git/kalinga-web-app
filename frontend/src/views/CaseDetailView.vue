@@ -127,7 +127,7 @@
                 <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Present address</p>
                 <p class="text-sm text-gray-700">
                   {{[caseData.present_street, caseData.barangay, caseData.city_muni, caseData.province,
-                  caseData.region].filter(v => v && String(v).trim()).join(', ') || '—'}}
+                  caseData.region].filter(v => v && String(v).trim()).join(', ') || '-'}}
                 </p>
               </div>
               <div class="bg-gray-50 rounded-xl p-4">
@@ -136,13 +136,13 @@
                   {{[caseData.per_street, caseData.per_barangay, caseData.per_city_muni, caseData.per_province,
                   caseData.per_region].filter(v => v && String(v).trim()).join(', ') ||
                     [caseData.prov_street, caseData.prov_barangay, caseData.prov_city_muni, caseData.prov_province,
-                    caseData.prov_region].filter(v => v && String(v).trim()).join(', ') || '—'}}
+                    caseData.prov_region].filter(v => v && String(v).trim()).join(', ') || '-'}}
                 </p>
               </div>
             </div>
           </div>
 
-          <!-- Map tab — v-show keeps DOM alive so map persists across tab switches -->
+          <!-- Map tab - v-show keeps DOM alive so map persists across tab switches -->
           <div v-show="activeTab === 'map'" class="animate-fade-in">
             <div class="space-y-3">
 
@@ -234,7 +234,7 @@
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center justify-between gap-2 mb-1">
                         <span class="font-semibold text-gray-800">
-                          {{ loc.current_lgu || '—' }}, {{ loc.current_province || '—' }}
+                          {{ loc.current_lgu || '-' }}, {{ loc.current_province || '-' }}
                         </span>
                         <span class="text-gray-400 flex-shrink-0">{{ fmtDate(loc.recorded_at) }}</span>
                       </div>
@@ -292,7 +292,7 @@
                     <td class="px-4 py-3 text-gray-600">{{ m.education }}</td>
                     <td class="px-4 py-3 text-gray-600">{{ m.occupation }}</td>
                     <td class="px-4 py-3 text-right text-gray-600">{{ m.income ? '₱' + Number(m.income).toLocaleString()
-                      : '—' }}</td>
+                      : '-' }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -360,7 +360,7 @@
                 <label class="block text-xs font-semibold text-gray-500 mb-1.5">Note type <span
                     class="text-red-400">*</span></label>
                 <select v-model="noteForm.note_type" class="input-base text-sm">
-                  <option value="">— Select type —</option>
+                  <option value="">- Select type -</option>
                   <option value="progress">Progress Note</option>
                   <option value="referral">MDT Referral / Transfer</option>
                   <option value="follow_up">Follow-up</option>
@@ -374,7 +374,7 @@
               </div>
             </div>
 
-            <!-- MDT referral fields — show only for referral type -->
+            <!-- MDT referral fields - show only for referral type -->
             <Transition name="fade-slide">
               <div v-if="noteForm.note_type === 'referral'"
                 class="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-3">
@@ -386,7 +386,7 @@
                   <div>
                     <label class="block text-xs font-semibold text-gray-500 mb-1.5">Referred to (MDT member / agency)</label>
                     <select v-model="noteForm.referred_to" class="input-base text-sm">
-                      <option value="">— Select MDT member —</option>
+                      <option value="">- Select MDT member -</option>
                       <optgroup label="Internal MDT">
                         <option value="Social Worker">Social Worker</option>
                         <option value="Psychosocial Officer">Psychosocial Officer</option>
@@ -411,7 +411,7 @@
                   <div>
                     <label class="block text-xs font-semibold text-gray-500 mb-1.5">Purpose of referral</label>
                     <select v-model="noteForm.referral_purpose" class="input-base text-sm">
-                      <option value="">— Select purpose —</option>
+                      <option value="">- Select purpose -</option>
                       <option value="Psychosocial support">Psychosocial support</option>
                       <option value="Medical assistance">Medical assistance</option>
                       <option value="Legal assistance">Legal assistance</option>
@@ -425,10 +425,10 @@
                   </div>
                 </div>
 
-                <!-- LGU Transfer fields — shown when referred to LGU-SWDO or transferring -->
+                <!-- LGU Transfer fields - shown when referred to LGU-SWDO or transferring -->
                 <div v-if="noteForm.referred_to === 'LGU - SWDO' || noteForm.referral_purpose === 'Shelter / temporary placement'"
                   class="bg-white border border-blue-200 rounded-xl p-3 space-y-3">
-                  <p class="text-xs font-bold text-blue-600">📍 LGU Transfer — new location details</p>
+                  <p class="text-xs font-bold text-blue-600">📍 LGU Transfer - new location details</p>
                   <div class="grid grid-cols-3 gap-2">
                     <div>
                       <label class="block text-xs font-semibold text-gray-500 mb-1">Region</label>
@@ -631,7 +631,7 @@
           <div>
             <label class="block text-xs font-semibold text-gray-600 mb-1.5">Service type <span class="text-red-400">*</span></label>
             <select v-model="svcForm.service_type" class="input-base">
-              <option value="">— Select —</option>
+              <option value="">- Select -</option>
               <option value="Medical">Medical</option>
               <option value="Financial">Financial</option>
               <option value="Funeral">Funeral</option>
@@ -701,7 +701,7 @@
             </button>
           </div>
           <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
-            📌 Fill in the client's <strong>current location</strong> — where they are now, which may differ from their registered address.
+            📌 Fill in the client's <strong>current location</strong> - where they are now, which may differ from their registered address.
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div class="col-span-2">
@@ -727,7 +727,7 @@
             <div class="col-span-2">
               <label class="block text-xs font-semibold text-gray-500 mb-1">Reason for update <span class="text-red-400">*</span></label>
               <select v-model="locationForm.transfer_reason" class="input-base text-sm">
-                <option value="">— Select reason —</option>
+                <option value="">- Select reason -</option>
                 <option value="Initial location record">Initial location record</option>
                 <option value="Transferred to another LGU">Transferred to another LGU</option>
                 <option value="Referred to another agency">Referred to another agency</option>
@@ -815,7 +815,7 @@ const editingNoteId = ref(null)
 
 function startEditNote(note) {
   editingNoteId.value = note.note_id
-  const parts = (note.action_taken || '').split(' — ')
+  const parts = (note.action_taken || '').split(' - ')
   noteForm.value = {
     note_type: note.note_type || '',
     date_note: String(note.date_note || '').slice(0, 10),
@@ -846,7 +846,7 @@ const parsedFamily = computed(() => {
 })
 
 function parseClassif(val) {
-  if (!val) return '—'
+  if (!val) return '-'
   if (typeof val === 'string' && val.startsWith('[')) {
     try { return JSON.parse(val).join(', ') } catch { return val }
   }
@@ -858,7 +858,7 @@ function classColor(cls) {
 }
 
 function fmtDate(d) {
-  return d ? new Date(d).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : '—'
+  return d ? new Date(d).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : '-'
 }
 
 function noteTypeLabel(type) {
@@ -920,7 +920,7 @@ async function doSubmitService() {
     await apiPost('addService', {
       case_id:      route.params.id,
       service_type: svcForm.value.specific_detail
-        ? `${svcForm.value.service_type} — ${svcForm.value.specific_detail}`
+        ? `${svcForm.value.service_type} - ${svcForm.value.specific_detail}`
         : svcForm.value.service_type,
       amount:       svcForm.value.amount,
       date_provided: svcForm.value.date_provided,
@@ -952,7 +952,7 @@ async function doSubmitNote() {
       date_note: noteForm.value.date_note,
       content: noteForm.value.content,
       action_taken: noteForm.value.note_type === 'referral'
-        ? [noteForm.value.referred_to, noteForm.value.referral_purpose].filter(Boolean).join(' — ')
+        ? [noteForm.value.referred_to, noteForm.value.referral_purpose].filter(Boolean).join(' - ')
         : noteForm.value.action_taken,
       next_steps: noteForm.value.next_steps,
     }
