@@ -202,20 +202,29 @@ function _groupCount(arr, key) {
   var acc = {};
   arr.forEach(function (item) {
     var val = item[key];
-    // Handle JSON array (e.g. classification stored as ["Child marriage","Early union"])
+    if (!val) { acc['Unknown'] = (acc['Unknown'] || 0) + 1; return; }
+    // Handle legacy JSON arrays ["a","b"]
     if (typeof val === 'string' && val.charAt(0) === '[') {
       try {
         var parsed = JSON.parse(val);
         if (Array.isArray(parsed)) {
           parsed.forEach(function(k) {
-            k = k || 'Unknown';
+            k = (k || 'Unknown').trim();
             acc[k] = (acc[k] || 0) + 1;
           });
           return;
         }
       } catch(e) {}
     }
-    var k = val || 'Unknown';
+    // Handle new plain text comma-separated "Early union, Child marriage"
+    if (typeof val === 'string' && val.indexOf(', ') !== -1) {
+      val.split(', ').forEach(function(k) {
+        k = k.trim() || 'Unknown';
+        acc[k] = (acc[k] || 0) + 1;
+      });
+      return;
+    }
+    var k = String(val).trim() || 'Unknown';
     acc[k] = (acc[k] || 0) + 1;
   });
   return acc;
