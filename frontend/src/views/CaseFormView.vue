@@ -91,7 +91,7 @@
                 <button type="button" @click.stop="showClassifDropdown = !showClassifDropdown"
                   class="field flex items-center justify-between w-full text-left min-h-[38px]">
                   <span class="truncate pr-2 text-sm" :class="form.classification.length ? 'text-gray-800' : 'text-gray-400'">
-                    {{ form.classification.length ? form.classification.join(', ') : '— Select —' }}
+                    {{ form.classification.length ? form.classification.join(', ') : '- Select -' }}
                   </span>
                   <svg class="w-4 h-4 text-gray-400 flex-shrink-0 transition-transform" :class="showClassifDropdown ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -129,7 +129,7 @@
                 <button type="button" @click.stop="showCircumDropdown = !showCircumDropdown"
                   class="field flex items-center justify-between w-full text-left min-h-[38px]">
                   <span class="truncate pr-2 text-sm" :class="form.other_circumstances.length ? 'text-gray-800' : 'text-gray-400'">
-                    {{ form.other_circumstances.length ? form.other_circumstances.join(', ') : '— Select circumstances —' }}
+                    {{ form.other_circumstances.length ? form.other_circumstances.join(', ') : '- Select circumstances -' }}
                   </span>
                   <svg class="w-4 h-4 text-gray-400 flex-shrink-0 transition-transform" :class="showCircumDropdown ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -217,7 +217,7 @@
                   <td class="px-2 py-2 text-gray-600 truncate">{{ m.education }}</td>
                   <td class="px-2 py-2 text-gray-600 truncate">{{ m.occupation }}</td>
                   <td class="px-2 py-2 text-right text-gray-600 truncate">
-                    {{ m.income ? '₱' + Number(m.income).toLocaleString() : '—' }}
+                    {{ m.income ? '₱' + Number(m.income).toLocaleString() : '-' }}
                   </td>
                   <td class="px-2 py-2 text-right">
                     <div class="flex items-center justify-end gap-1.5">
@@ -423,7 +423,7 @@ function toDateInput(val) {
 
 // Display birthdate as MM/DD/YYYY
 function fmtBirthdate(val) {
-  if (!val) return '—'
+  if (!val) return '-'
   const [y, m, d] = String(val).slice(0, 10).split('-')
   if (!y || !m || !d) return val
   return `${m}/${d}/${y}`
@@ -488,7 +488,7 @@ function onMemberBirthdateChange() {
 // Display age for a saved member row
 function memberAge(m) {
   if (m.age) return m.age
-  return calcAge(m.birthdate) || '—'
+  return calcAge(m.birthdate) || '-'
 }
 
 function startEditMember(i) {
