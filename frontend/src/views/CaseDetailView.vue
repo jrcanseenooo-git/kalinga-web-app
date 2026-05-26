@@ -40,7 +40,7 @@
     <template v-else-if="caseData">
 
       <!-- Sticky action bar -->
-      <div v-if="auth.isAdmin || auth.isCaseWorker"
+      <div v-if="auth.canEdit"
         class="flex items-center justify-between mb-4 bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-100 px-4 py-3 sticky top-0 z-10 shadow-sm no-print">
         <RouterLink to="/cases" class="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1.5">
           <ChevronLeftIcon class="w-4 h-4" /> Back to Cases
@@ -218,7 +218,7 @@
             </h3>
             <p class="text-xs text-gray-400 mt-0.5">Case history, referrals to MDT members, and progress updates</p>
           </div>
-          <button v-if="auth.isAdmin || auth.isCaseWorker" @click="showNoteForm = !showNoteForm"
+          <button v-if="auth.canEdit" @click="showNoteForm = !showNoteForm"
             class="btn-primary text-xs py-2">
             <PlusIcon class="w-3.5 h-3.5" />
             {{ showNoteForm ? 'Cancel' : 'Add note' }}
@@ -378,7 +378,7 @@
                   <div class="text-right flex-shrink-0 space-y-1">
                     <p class="text-xs font-semibold text-gray-500">{{ fmtDate(note.date_note) }}</p>
                     <p class="text-xs text-gray-400">{{ note.created_by }}</p>
-                    <button v-if="auth.isAdmin || auth.isCaseWorker" @click="startEditNote(note)"
+                    <button v-if="auth.canEdit" @click="startEditNote(note)"
                       class="text-xs text-brand-600 hover:text-brand-800 font-semibold transition-colors">
                       Edit
                     </button>
@@ -413,7 +413,7 @@
             <ClipboardDocumentListIcon class="w-4 h-4 text-gray-400" />
             Services provided
           </h3>
-          <button v-if="auth.isAdmin || auth.isCaseWorker" @click="showServiceForm = true"
+          <button v-if="auth.canEdit" @click="showServiceForm = true"
             class="btn-primary text-xs py-2">
             <PlusIcon class="w-3.5 h-3.5" /> Add service
           </button>
