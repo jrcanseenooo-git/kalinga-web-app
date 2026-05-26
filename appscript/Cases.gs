@@ -5,7 +5,7 @@ const FAMILY_COLS = [
   'member_id', 'case_id',
   'client_last', 'client_first', 'city_muni', 'province', 'region',
   'name', 'birthdate', 'age', 'sex', 'relationship',
-  'education', 'occupation', 'income',
+  'education', 'occupation',
   'created_at', 'updated_at',
 ];
 
@@ -92,7 +92,6 @@ function _saveFamilyMembers(caseId, members, caseSnapshot) {
         case 'relationship': return _stringify(m.relationship || '');
         case 'education':    return _stringify(m.education || '');
         case 'occupation':   return _stringify(m.occupation || '');
-        case 'income':       return _stringify(m.income || '');
         case 'created_at':
         case 'updated_at':   return now;
         default:             return '';
