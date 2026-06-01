@@ -207,7 +207,7 @@
               <td class="px-5 py-3.5 hidden md:table-cell">
                 <div class="space-y-1">
                   <span class="badge text-xs" :class="classColor(c.classification)">
-                    {{ parseClassif(c.classification) }}
+                    {{ parseClassif(c.cefmu_type || c.classification) }}
                   </span>
                 </div>
               </td>
@@ -310,6 +310,8 @@ watch(isOnline, async (online) => {
   if (online && offlineMode.value) {
     offlineMode.value = false
     error.value = null
+    // Wait for sync to complete first
+    await new Promise(resolve => setTimeout(resolve, 4000))
     loading.value = true
     try {
       const data = await api('getCases', {}, { skipCache: true })
@@ -325,6 +327,8 @@ watch(isOnline, async (online) => {
 // ── Watch: reload after sync completes ───────────────────────
 watch(syncedAt, async () => {
   if (!syncedAt.value) return
+  // Wait 3 seconds for Apps Script to finish writing to the sheet
+  await new Promise(resolve => setTimeout(resolve, 3000))
   loading.value = true
   try {
     const data = await api('getCases', {}, { skipCache: true })
@@ -412,6 +416,7 @@ function clearFilters() {
 
 function parseClassif(val) {
   if (!val) return '-'
+  if (Array.isArray(val)) return val.join(', ')
   if (typeof val === 'string' && val.startsWith('[')) {
     try { return JSON.parse(val).join(', ') } catch { return val }
   }
