@@ -90,8 +90,7 @@
     </div>
 
     <!-- ── Offline notice ── -->
-    <div v-if="offlineMode"
-      class="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
+    <div v-if="offlineMode" class="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
       <div class="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
         <span class="text-lg">📶</span>
       </div>
@@ -105,8 +104,7 @@
     </div>
 
     <!-- ── Error notice ── -->
-    <div v-if="error"
-      class="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-4">
+    <div v-if="error" class="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-4">
       <p class="text-sm text-red-700">{{ error }}</p>
     </div>
 
@@ -275,7 +273,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { isOnline } from '@/composables/useSync'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/services/api'
 import {
@@ -284,6 +283,7 @@ import {
   XMarkIcon, UserIcon,
 } from '@heroicons/vue/24/outline'
 
+// ── State ─────────────────────────────────────────────────────
 const auth = useAuthStore()
 const cases = ref([])
 const loading = ref(true)
@@ -291,25 +291,30 @@ const offlineMode = ref(false)
 const error = ref(null)
 const page = ref(1)
 const pageSize = 20
-
 const search = ref('')
 const filterStatus = ref('')
 const filterClass = ref('')
 const filterSex = ref('')
 const sortBy = ref('date_intake_desc')
 
-const hasFilters = computed(() =>
-  !!search.value || !!filterStatus.value || !!filterClass.value || !!filterSex.value
-)
+// ── Watch: reload when coming back online ─────────────────────
+watch(isOnline, async (online) => {
+  if (online && offlineMode.value) {
+    offlineMode.value = false
+    error.value = null
+    loading.value = true
+    try {
+      const data = await api('getCases')
+      cases.value = data || []
+    } catch (e) {
+      error.value = e.message
+    } finally {
+      loading.value = false
+    }
+  }
+})
 
-function clearFilters() {
-  search.value = ''
-  filterStatus.value = ''
-  filterClass.value = ''
-  filterSex.value = ''
-  page.value = 1
-}
-
+// ── Lifecycle ─────────────────────────────────────────────────
 onMounted(async () => {
   try {
     const data = await api('getCases')
@@ -325,6 +330,11 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+// ── Computed ──────────────────────────────────────────────────
+const hasFilters = computed(() =>
+  !!search.value || !!filterStatus.value || !!filterClass.value || !!filterSex.value
+)
 
 const filtered = computed(() =>
   cases.value.filter(c => {
@@ -346,19 +356,28 @@ const filtered = computed(() =>
 const sorted = computed(() => {
   const data = [...filtered.value]
   switch (sortBy.value) {
-    case 'date_intake_asc': return data.sort((a, b) => new Date(a.date_intake) - new Date(b.date_intake))
+    case 'date_intake_asc':  return data.sort((a, b) => new Date(a.date_intake) - new Date(b.date_intake))
     case 'date_intake_desc': return data.sort((a, b) => new Date(b.date_intake) - new Date(a.date_intake))
-    case 'name_asc': return data.sort((a, b) => (a.client_last || '').localeCompare(b.client_last || ''))
-    case 'status': return data.sort((a, b) => (a.status || '').localeCompare(b.status || ''))
+    case 'name_asc':         return data.sort((a, b) => (a.client_last || '').localeCompare(b.client_last || ''))
+    case 'status':           return data.sort((a, b) => (a.status || '').localeCompare(b.status || ''))
     default: return data
   }
 })
 
-const paginated = computed(() => sorted.value.slice((page.value - 1) * pageSize, page.value * pageSize))
+const paginated  = computed(() => sorted.value.slice((page.value - 1) * pageSize, page.value * pageSize))
 const totalPages = computed(() => Math.ceil(sorted.value.length / pageSize))
 const activeCount = computed(() => filtered.value.filter(c => c.status === 'active').length)
 const closedCount = computed(() => filtered.value.filter(c => c.status === 'closed').length)
 const femaleCount = computed(() => filtered.value.filter(c => c.sex === 'Female').length)
+
+// ── Methods ───────────────────────────────────────────────────
+function clearFilters() {
+  search.value = ''
+  filterStatus.value = ''
+  filterClass.value = ''
+  filterSex.value = ''
+  page.value = 1
+}
 
 function parseClassif(val) {
   if (!val) return '-'
@@ -368,13 +387,8 @@ function parseClassif(val) {
   return val
 }
 
-function classifyColor(cls) {
-  return 'bg-brand-100 text-brand-600'
-}
-
-function classColor(cls) {
-  return 'bg-brand-50 text-brand-700'
-}
+function classifyColor(cls) { return 'bg-brand-100 text-brand-600' }
+function classColor(cls)    { return 'bg-brand-50 text-brand-700' }
 
 function fmtDate(d) {
   return d ? new Date(d).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : '-'
