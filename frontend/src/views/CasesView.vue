@@ -387,7 +387,7 @@ onMounted(() => {
     }).then(fresh => {
       cases.value = fresh || []
     }).catch(() => { })
-  }, 10 * 1000)
+  }, 30 * 1000)
 })
 
 onUnmounted(() => {
