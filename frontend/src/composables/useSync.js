@@ -1,14 +1,17 @@
 import { ref, onMounted, onUnmounted } from 'vue'
-import { getPendingActions, getPendingCount, deleteAction } from '@/services/offlineQueue'
+import {
+  getPendingActions,
+  deleteAction,
+  pendingCount,
+  refreshCount,
+} from '@/services/offlineQueue'
 import { apiPost } from '@/services/api'
 
-export const pendingCount = ref(0)        // ← ADD THIS — was missing
-export const isSyncing    = ref(false)
-export const isOnline     = ref(navigator.onLine)
+// Re-export so AppLayout/CasesView can still import from here
+export { pendingCount } from '@/services/offlineQueue'
 
-export async function refreshCount() {
-  pendingCount.value = await getPendingCount()
-}
+export const isSyncing = ref(false)
+export const isOnline  = ref(navigator.onLine)
 
 export async function flushQueue() {
   if (isSyncing.value || !navigator.onLine) return
@@ -39,7 +42,6 @@ export function useSync() {
     isOnline.value = true
     flushQueue()
   }
-
   function handleOffline() {
     isOnline.value = false
   }
