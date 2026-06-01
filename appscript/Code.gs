@@ -1,4 +1,4 @@
-const SPREADSHEET_ID = '';
+const SPREADSHEET_ID = '1O9C0eDYsMrpWeCKIMalxT9Xlz1hxXSXS0ZzGmZYDJ3w';
 const ALLOWED_DOMAIN = 'dswd.gov.ph';
 
 const SESSION_TOKEN_PREFIX = 'ses_';
@@ -102,7 +102,7 @@ function doGet(e) {
     case 'getCase': return getCase(e, user);
     case 'getDashboard': return getDashboard(e, user);
     case 'getLookups': return getLookups(e, user);
-    case 'getMe': return _output(user);
+    case 'getMe': return getMe(params, user, token);
     case 'getUsers': return getUsers(e, user);
     case 'createCase': return createCase(params, user);
     case 'updateCase': return updateCase(params, user);
@@ -125,4 +125,75 @@ function doGet(e) {
 
 function doPost(e) {
   return _error('Use GET', 405);
+}
+
+function getMe(params, user, token) {
+  // If already using a ses_ token, just return user info
+  // No need to create another session
+  if (token && token.startsWith(SESSION_TOKEN_PREFIX)) {
+    return _output({
+      email:    user.email,
+      role:     user.role,
+      lgu_code: user.lgu_code,
+      region:   user.region,
+      province: user.province,
+    });
+  }
+
+  // Google JWT login — create a long-lived ses_ session token
+  // so the user doesn't need to re-login after token expiry
+  const sessionToken = _createSession(user.email);
+
+  return _output({
+    email:         user.email,
+    role:          user.role,
+    lgu_code:      user.lgu_code,
+    region:        user.region,
+    province:      user.province,
+    session_token: sessionToken,
+  });
+}
+
+function _createSession(email) {
+  const sheet = _getSheet('sessions');
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+  const tokenIdx   = headers.indexOf('token');
+  const emailIdx   = headers.indexOf('email');
+  const expiresIdx = headers.indexOf('expires_at');
+
+  // Check if a valid session already exists for this email
+  if (sheet.getLastRow() > 1) {
+    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+    for (const row of rows) {
+      const rowEmail   = row[emailIdx];
+      const rowToken   = row[tokenIdx];
+      const rowExpires = new Date(row[expiresIdx]);
+      if (rowEmail === email && rowToken && rowExpires > new Date()) {
+        return rowToken;   // reuse existing valid session
+      }
+    }
+  }
+
+  // Create new session — expires in 30 days
+  const token    = SESSION_TOKEN_PREFIX + Utilities.base64EncodeWebSafe(
+    Utilities.computeDigest(
+      Utilities.DigestAlgorithm.SHA_256,
+      email + Date.now() + Math.random()
+    )
+  ).replace(/=/g, '').substring(0, 60);
+
+  const expires  = new Date();
+  expires.setDate(expires.getDate() + 30);   // 30 days
+
+  // Build new row matching sessions sheet columns
+  const newRow = headers.map(h => {
+    if (h === 'token')      return token;
+    if (h === 'email')      return email;
+    if (h === 'expires_at') return expires.toISOString();
+    return '';
+  });
+
+  sheet.appendRow(newRow);
+  return token;
 }
