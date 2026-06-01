@@ -7,11 +7,11 @@ import {
 } from '@/services/offlineQueue'
 import { apiPost } from '@/services/api'
 
-// Re-export so AppLayout/CasesView can still import from here
 export { pendingCount } from '@/services/offlineQueue'
 
-export const isSyncing = ref(false)
-export const isOnline  = ref(navigator.onLine)
+export const isSyncing   = ref(false)
+export const isOnline    = ref(navigator.onLine)
+export const syncedAt    = ref(null)
 
 export async function flushQueue() {
   if (isSyncing.value || !navigator.onLine) return
@@ -31,6 +31,7 @@ export async function flushQueue() {
         break
       }
     }
+    syncedAt.value = Date.now()
   } finally {
     isSyncing.value = false
     await refreshCount()
