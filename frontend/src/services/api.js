@@ -8,7 +8,7 @@ const _cache = new Map();
 const CACHE_TTL = {
   getDashboard: 2 * 60 * 1000,
   getPublicDashboard: 5 * 60 * 1000,
-  getCases: 10 * 1000,
+  getCases: 30 * 1000,
   getLookups: 30 * 60 * 1000,
   getUsers: 5 * 60 * 1000,
 };
@@ -89,13 +89,13 @@ export async function api(action, params = {}, options = {}) {
   }
 
   if (cached && _isStale(cached)) {
-    // If no revalidate callback — just fetch fresh directly, don't serve stale
     if (!options.revalidate) {
+      // No revalidate callback — fetch fresh directly
       const data = await _fetch(action, params);
       _setCached(key, data, ttl);
       return data;
     }
-    // Has revalidate callback — serve stale instantly, fetch fresh in background
+    // Has revalidate — serve stale instantly, update in background
     _fetch(action, params)
       .then((fresh) => {
         _setCached(key, fresh, ttl);
