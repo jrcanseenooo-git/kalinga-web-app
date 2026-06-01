@@ -1,15 +1,16 @@
+import { queueAction } from './offlineQueue'
+
 const BASE_URL = import.meta.env.VITE_APPS_SCRIPT_URL;
 
 // ── Cache store ──────────────────────────────────────────────
 const _cache = new Map();
 
-// TTLs in milliseconds
 const CACHE_TTL = {
-  getDashboard: 2 * 60 * 1000, // 2 min  - auth dashboard
-  getPublicDashboard: 5 * 60 * 1000, // 5 min  - public dashboard
-  getCases: 2 * 60 * 1000, // 2 min  - case list
-  getLookups: 30 * 60 * 1000, // 30 min - rarely changes
-  getUsers: 5 * 60 * 1000, // 5 min
+  getDashboard:      2 * 60 * 1000,
+  getPublicDashboard: 5 * 60 * 1000,
+  getCases:          2 * 60 * 1000,
+  getLookups:       30 * 60 * 1000,
+  getUsers:          5 * 60 * 1000,
 };
 
 function _cacheKey(action, params) {
@@ -24,7 +25,7 @@ function _cacheKey(action, params) {
 function _getCached(key) {
   const entry = _cache.get(key);
   if (!entry) return null;
-  return entry; // caller decides if stale
+  return entry;
 }
 
 function _setCached(key, data, ttl) {
@@ -35,20 +36,23 @@ function _isStale(entry) {
   return Date.now() - entry.ts > entry.ttl;
 }
 
-// Invalidate cache entries matching an action prefix
-// Call after write operations so the next read is fresh
 export function invalidateCache(action) {
   for (const key of _cache.keys()) {
     if (key.startsWith(action)) _cache.delete(key);
   }
 }
 
-// ── Raw fetch (no cache) ─────────────────────────────────────
 function getToken() {
   return localStorage.getItem("cefmu_token") || "";
 }
 
+// ── Raw fetch (no cache) ─────────────────────────────────────
 async function _fetch(action, params = {}) {
+  // ── Offline guard ──────────────────────────────────────────
+  if (!navigator.onLine) {
+    throw new Error('OFFLINE')   // ← ADD THIS
+  }
+
   const url = new URL(BASE_URL);
   url.searchParams.set("action", action);
   url.searchParams.set("token", getToken());
@@ -64,12 +68,9 @@ async function _fetch(action, params = {}) {
 }
 
 // ── Public api() — cache-aware ───────────────────────────────
-// options.revalidate: callback called with fresh data after bg fetch
-// options.skipCache:  force a fresh fetch
 export async function api(action, params = {}, options = {}) {
   const ttl = CACHE_TTL[action];
 
-  // No TTL configured → fetch directly, no caching
   if (!ttl || options.skipCache) {
     return _fetch(action, params);
   }
@@ -78,7 +79,6 @@ export async function api(action, params = {}, options = {}) {
   const cached = _getCached(key);
 
   if (cached && !_isStale(cached)) {
-    // Fresh cache — return immediately, optionally kick bg revalidation
     if (options.revalidate) {
       _fetch(action, params)
         .then((fresh) => {
@@ -91,8 +91,7 @@ export async function api(action, params = {}, options = {}) {
   }
 
   if (cached && _isStale(cached)) {
-    // Stale-while-revalidate: return stale data instantly,
-    // then fetch fresh in background and call revalidate()
+    // Stale-while-revalidate: return stale instantly, fetch fresh in background
     _fetch(action, params)
       .then((fresh) => {
         _setCached(key, fresh, ttl);
@@ -107,8 +106,6 @@ export async function api(action, params = {}, options = {}) {
   _setCached(key, data, ttl);
   return data;
 }
-
-import { queueAction } from './offlineQueue'
 
 // ── apiPost — write ops, invalidates related caches ─────────
 export async function apiPost(action, body = {}) {
@@ -128,19 +125,18 @@ export async function apiPost(action, body = {}) {
   const json = await res.json()
   if (json.status !== 200) throw new Error(json.data?.error || 'API error')
 
-  // Invalidate caches likely affected by this write
   const invalidations = {
-    createCase:  ['getCases', 'getDashboard', 'getPublicDashboard'],
-    updateCase:  ['getCases', 'getDashboard', 'getPublicDashboard', 'getCase'],
-    closeCase:   ['getCases', 'getDashboard', 'getPublicDashboard', 'getCase'],
-    reopenCase:  ['getCases', 'getDashboard', 'getPublicDashboard', 'getCase'],
-    addService:  ['getDashboard', 'getPublicDashboard', 'getCase'],
-    addNote:     ['getCase'],
-    updateNote:  ['getCase'],
-    saveLocation:['getCase'],
-    createUser:  ['getUsers'],
-    updateUser:  ['getUsers'],
-    toggleUser:  ['getUsers'],
+    createCase:   ['getCases', 'getDashboard', 'getPublicDashboard'],
+    updateCase:   ['getCases', 'getDashboard', 'getPublicDashboard', 'getCase'],
+    closeCase:    ['getCases', 'getDashboard', 'getPublicDashboard', 'getCase'],
+    reopenCase:   ['getCases', 'getDashboard', 'getPublicDashboard', 'getCase'],
+    addService:   ['getDashboard', 'getPublicDashboard', 'getCase'],
+    addNote:      ['getCase'],
+    updateNote:   ['getCase'],
+    saveLocation: ['getCase'],
+    createUser:   ['getUsers'],
+    updateUser:   ['getUsers'],
+    toggleUser:   ['getUsers'],
   }
   ;(invalidations[action] || []).forEach(invalidateCache)
 
