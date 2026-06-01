@@ -80,18 +80,17 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const auth = useAuthStore()
-
   if (to.meta.public) return true
 
-  // Allow through if offline but has a cached session
   if (!auth.isLoggedIn) {
     const cachedToken = localStorage.getItem('cefmu_token')
     const cachedUser  = localStorage.getItem('cefmu_user')
 
+    // If offline but has cached credentials — let them through
     if (cachedToken && cachedUser && !navigator.onLine) {
-      // Session already restored from localStorage by Pinia store on init
       return true
     }
+
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 
