@@ -1,4 +1,4 @@
-const SPREADSHEET_ID = '1O9C0eDYsMrpWeCKIMalxT9Xlz1hxXSXS0ZzGmZYDJ3w';
+const SPREADSHEET_ID = '';
 const ALLOWED_DOMAIN = 'dswd.gov.ph';
 
 const SESSION_TOKEN_PREFIX = 'ses_';
