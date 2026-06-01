@@ -37,7 +37,7 @@ const props = defineProps({
   value: [Number, String],
   sub: String,
   color: { default: 'brand' },
-  icon: Object,
+  icon: [Object, Function],
   trend: Number,
   loading: Boolean,
 })
