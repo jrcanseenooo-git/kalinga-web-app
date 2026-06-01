@@ -285,7 +285,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { isOnline, syncedAt } from '@/composables/useSync'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/services/api'
@@ -344,6 +344,8 @@ watch(syncedAt, async () => {
 })
 
 // ── Lifecycle ─────────────────────────────────────────────────
+let autoRefreshTimer = null
+
 onMounted(async () => {
   try {
     const data = await api('getCases')
@@ -369,6 +371,22 @@ onMounted(async () => {
   }
 })
 
+// ── Auto-refresh every 30 seconds while on this page ─────────
+onMounted(() => {
+  autoRefreshTimer = setInterval(async () => {
+    if (!isOnline.value || offlineMode.value) return
+    try {
+      const data = await api('getCases', {}, { skipCache: true })
+      cases.value = data || []
+    } catch (e) {
+      // silently fail — don't show error for background refresh
+    }
+  }, 30 * 1000)
+})
+
+onUnmounted(() => {
+  clearInterval(autoRefreshTimer)
+})
 
 async function refreshCases() {
   cases.value = []
