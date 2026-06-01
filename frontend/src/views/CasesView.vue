@@ -97,8 +97,9 @@
       <div>
         <p class="text-sm font-semibold text-amber-800">You are currently offline</p>
         <p class="text-xs text-amber-600 mt-0.5">
-          The case list cannot be loaded without internet. Any new cases you create will be
-          saved locally and synced automatically when you reconnect.
+          Showing <strong>{{ cases.length }}</strong> locally saved
+          {{ cases.length === 1 ? 'entry' : 'entries' }} pending sync.
+          All data will sync automatically when you reconnect.
         </p>
       </div>
     </div>
@@ -225,7 +226,13 @@
 
               <!-- Status -->
               <td class="px-5 py-3.5">
-                <span class="badge"
+                <!-- Pending offline badge -->
+                <span v-if="c._offline" class="badge bg-amber-50 text-amber-700">
+                  <span class="w-1.5 h-1.5 rounded-full mr-1.5 bg-amber-400 animate-pulse"></span>
+                  Pending sync
+                </span>
+                <!-- Normal status badge -->
+                <span v-else class="badge"
                   :class="c.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'">
                   <span class="w-1.5 h-1.5 rounded-full mr-1.5"
                     :class="c.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'"></span>
@@ -277,6 +284,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { isOnline } from '@/composables/useSync'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/services/api'
+import { getPendingActions } from '@/services/offlineQueue'
 import {
   MagnifyingGlassIcon, FolderOpenIcon, ChevronRightIcon,
   ChevronLeftIcon, ChevronDownIcon, ArrowDownTrayIcon,
@@ -321,8 +329,17 @@ onMounted(async () => {
     cases.value = data || []
   } catch (e) {
     if (e.message === 'OFFLINE') {
-      cases.value = []
       offlineMode.value = true
+      // Load pending entries from IndexedDB to show while offline
+      const queued = await getPendingActions()
+      cases.value = queued
+        .filter(item => item.action === 'createCase')
+        .map(item => ({
+          ...item.payload,
+          case_id: `PENDING-${item.id}`,
+          status: 'pending',
+          _offline: true,
+        }))
     } else {
       error.value = e.message
     }
