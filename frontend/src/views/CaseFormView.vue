@@ -355,6 +355,15 @@
           </RouterLink>
         </div>
 
+        <!-- Offline save notice -->
+        <Transition name="fade">
+          <div v-if="offlineNotice"
+            class="mb-4 flex items-center gap-2.5 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl px-4 py-3">
+            <span class="text-base">📶</span>
+            <span>{{ offlineNotice }}</span>
+          </div>
+        </Transition>
+
       </form>
     </div>
   </div>
@@ -392,6 +401,7 @@ const classificationOptions = [
 
 const showClassifDropdown = ref(false)
 const classifDropdownRef  = ref(null)
+const offlineNotice = ref('')
 
 const otherCircumstances = [
   'Child with Disability',
@@ -678,15 +688,33 @@ async function doSubmit() {
     const payload = {
       ...form.value,
       age: computedAge.value,
-      // Send members as JSON; backend saves to dedicated sheet AND updates JSON column
       family_members: JSON.stringify(familyMembers.value),
     }
     if (isEdit.value) {
-      await apiPost('updateCase', { case_id: route.params.id, ...payload })
+      const result = await apiPost('updateCase', { case_id: route.params.id, ...payload })
+
+      if (result?.offline) {
+        // Queued offline — go back to case detail, it will show stale cached data
+        showConfirm.value = false
+        offlineNotice.value = 'Changes saved offline and will sync when you reconnect.'
+        setTimeout(() => router.push(`/cases/${route.params.id}`), 1800)
+        return
+      }
+
       router.push(`/cases/${route.params.id}`)
+
     } else {
-      const { case_id } = await apiPost('createCase', payload)
-      router.push(`/cases/${case_id}`)
+      const result = await apiPost('createCase', payload)
+
+      if (result?.offline) {
+        // Queued offline — go back to cases list
+        showConfirm.value = false
+        offlineNotice.value = 'Case saved offline and will sync automatically when you reconnect.'
+        setTimeout(() => router.push('/cases'), 1800)
+        return
+      }
+
+      router.push(`/cases/${result.case_id}`)
     }
   } catch (e) {
     error.value = e.message
