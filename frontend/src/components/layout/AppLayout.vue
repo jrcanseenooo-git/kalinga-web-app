@@ -83,6 +83,40 @@
         </div>
 
         <div class="ml-auto flex items-center gap-3">
+
+          <!-- ── Sync / Connectivity Status Pill ── -->
+          <div
+            class="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full transition-all duration-300"
+            :class="isOnline
+              ? (pendingCount > 0 ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700')
+              : 'bg-amber-50 text-amber-700'"
+          >
+            <!-- dot -->
+            <span
+              class="w-2 h-2 rounded-full flex-shrink-0"
+              :class="isOnline
+                ? (isSyncing ? 'bg-blue-400 animate-pulse' : pendingCount > 0 ? 'bg-blue-500' : 'bg-emerald-500')
+                : 'bg-amber-400 animate-pulse'"
+            />
+            <!-- label -->
+            <span v-if="!isOnline">
+              Offline{{ pendingCount > 0 ? ` · ${pendingCount} pending` : '' }}
+            </span>
+            <span v-else-if="isSyncing">Syncing…</span>
+            <span v-else-if="pendingCount > 0">{{ pendingCount }} to sync</span>
+            <span v-else>Online</span>
+
+            <!-- Manual sync button — only shown when online and there are pending items -->
+            <button
+              v-if="isOnline && pendingCount > 0 && !isSyncing"
+              @click="flushQueue"
+              class="ml-0.5 text-blue-500 hover:text-blue-700 transition-colors"
+              title="Sync now"
+            >
+              <ArrowPathIcon class="w-3.5 h-3.5" />
+            </button>
+          </div>
+
           <!-- Role badge -->
           <span class="badge text-xs" :class="roleBadge.class">
             {{ roleBadge.label }}
@@ -96,6 +130,20 @@
           </RouterLink>
         </div>
       </header>
+
+      <!-- Offline banner — shown when offline -->
+      <Transition name="slide-down">
+        <div
+          v-if="!isOnline"
+          class="bg-amber-50 border-b border-amber-200 px-6 py-2 flex items-center gap-2 text-xs text-amber-800"
+        >
+          <WifiIcon class="w-4 h-4 text-amber-500 flex-shrink-0" />
+          <span>
+            <strong>You are offline.</strong>
+            New cases and updates will be saved locally and synced automatically when you reconnect.
+          </span>
+        </div>
+      </Transition>
 
       <!-- Page content -->
       <main class="flex-1 overflow-y-auto p-6">
@@ -137,6 +185,7 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { isOnline, isSyncing, pendingCount, flushQueue } from '@/composables/useSync'
 import {
   Squares2X2Icon,
   ChartBarIcon,
@@ -149,6 +198,8 @@ import {
   ArrowTopRightOnSquareIcon,
   PlusIcon,
   Bars3Icon,
+  ArrowPathIcon,
+  WifiIcon,
 } from '@heroicons/vue/24/outline'
 
 const auth = useAuthStore()
@@ -208,3 +259,15 @@ const roleBadge = computed(() => {
   return map[auth.role] || { label: auth.role, class: 'bg-gray-100 text-gray-600' }
 })
 </script>
+
+<style scoped>
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.3s ease;
+}
+.slide-down-enter-from,
+.slide-down-leave-to {
+  opacity: 0;
+  transform: translateY(-100%);
+}
+</style>
