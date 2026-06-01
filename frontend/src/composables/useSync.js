@@ -2,11 +2,11 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { getPendingActions, getPendingCount, deleteAction } from '@/services/offlineQueue'
 import { apiPost } from '@/services/api'
 
-export const pendingCount = ref(0)
+export const pendingCount = ref(0)        // ← ADD THIS — was missing
 export const isSyncing    = ref(false)
 export const isOnline     = ref(navigator.onLine)
 
-async function refreshCount() {
+export async function refreshCount() {
   pendingCount.value = await getPendingCount()
 }
 
@@ -25,7 +25,7 @@ export async function flushQueue() {
         pendingCount.value = Math.max(0, pendingCount.value - 1)
       } catch (e) {
         console.warn('Sync failed for queued item, will retry later:', e)
-        break // stop on first failure, retry next time
+        break
       }
     }
   } finally {
@@ -48,7 +48,6 @@ export function useSync() {
     await refreshCount()
     window.addEventListener('online',  handleOnline)
     window.addEventListener('offline', handleOffline)
-    // Try to flush on app load in case items were queued in a previous session
     if (navigator.onLine) flushQueue()
   })
 
