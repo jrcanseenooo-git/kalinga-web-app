@@ -44,8 +44,7 @@
           <XMarkIcon class="w-3.5 h-3.5" /> Clear
         </button>
       </div>
-      <button @click="refreshCases" :disabled="loading"
-        class="btn-secondary text-xs py-2 flex-shrink-0">
+      <button @click="refreshCases" :disabled="loading" class="btn-secondary text-xs py-2 flex-shrink-0">
         <ArrowPathIcon class="w-3.5 h-3.5" :class="loading ? 'animate-spin' : ''" />
         Refresh
       </button>
@@ -348,7 +347,11 @@ let autoRefreshTimer = null
 
 onMounted(async () => {
   try {
-    const data = await api('getCases')
+    const data = await api('getCases', {}, {
+      revalidate(fresh) {
+        cases.value = fresh || []
+      }
+    })
     cases.value = data || []
   } catch (e) {
     if (e.message === 'OFFLINE') {
@@ -375,13 +378,16 @@ onMounted(async () => {
 onMounted(() => {
   autoRefreshTimer = setInterval(async () => {
     if (!isOnline.value || offlineMode.value) return
-    try {
-      const data = await api('getCases', {}, { skipCache: true })
-      cases.value = data || []
-    } catch (e) {
-      // silently fail — don't show error for background refresh
-    }
-  }, 30 * 1000)
+    // Use revalidate so UI updates without loading flicker
+    api('getCases', {}, {
+      skipCache: true,
+      revalidate(fresh) {
+        cases.value = fresh || []
+      }
+    }).then(fresh => {
+      cases.value = fresh || []
+    }).catch(() => { })
+  }, 10 * 1000)
 })
 
 onUnmounted(() => {
@@ -431,15 +437,15 @@ const filtered = computed(() =>
 const sorted = computed(() => {
   const data = [...filtered.value]
   switch (sortBy.value) {
-    case 'date_intake_asc':  return data.sort((a, b) => new Date(a.date_intake) - new Date(b.date_intake))
+    case 'date_intake_asc': return data.sort((a, b) => new Date(a.date_intake) - new Date(b.date_intake))
     case 'date_intake_desc': return data.sort((a, b) => new Date(b.date_intake) - new Date(a.date_intake))
-    case 'name_asc':         return data.sort((a, b) => (a.client_last || '').localeCompare(b.client_last || ''))
-    case 'status':           return data.sort((a, b) => (a.status || '').localeCompare(b.status || ''))
+    case 'name_asc': return data.sort((a, b) => (a.client_last || '').localeCompare(b.client_last || ''))
+    case 'status': return data.sort((a, b) => (a.status || '').localeCompare(b.status || ''))
     default: return data
   }
 })
 
-const paginated  = computed(() => sorted.value.slice((page.value - 1) * pageSize, page.value * pageSize))
+const paginated = computed(() => sorted.value.slice((page.value - 1) * pageSize, page.value * pageSize))
 const totalPages = computed(() => Math.ceil(sorted.value.length / pageSize))
 const activeCount = computed(() => filtered.value.filter(c => c.status === 'active').length)
 const closedCount = computed(() => filtered.value.filter(c => c.status === 'closed').length)
@@ -464,7 +470,7 @@ function parseClassif(val) {
 }
 
 function classifyColor(cls) { return 'bg-brand-100 text-brand-600' }
-function classColor(cls)    { return 'bg-brand-50 text-brand-700' }
+function classColor(cls) { return 'bg-brand-50 text-brand-700' }
 
 function fmtDate(d) {
   return d ? new Date(d).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : '-'
