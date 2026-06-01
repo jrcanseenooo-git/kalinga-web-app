@@ -79,13 +79,26 @@ const router = createRouter({
 });
 
 router.beforeEach((to) => {
-  const auth = useAuthStore();
-  if (to.meta.public) return true;
-  if (!auth.isLoggedIn)
-    return { name: "login", query: { redirect: to.fullPath } };
+  const auth = useAuthStore()
+
+  if (to.meta.public) return true
+
+  // Allow through if offline but has a cached session
+  if (!auth.isLoggedIn) {
+    const cachedToken = localStorage.getItem('cefmu_token')
+    const cachedUser  = localStorage.getItem('cefmu_user')
+
+    if (cachedToken && cachedUser && !navigator.onLine) {
+      // Session already restored from localStorage by Pinia store on init
+      return true
+    }
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
+
   if (to.meta.roles && !to.meta.roles.includes(auth.role))
-    return { name: "dashboard" };
-  return true;
+    return { name: 'dashboard' }
+
+  return true
 });
 
 export default router;
