@@ -8,7 +8,7 @@ const _cache = new Map()
 const CACHE_TTL = {
   getDashboard:       2 * 60 * 1000,
   getPublicDashboard: 5 * 60 * 1000,
-  getCases:           2 * 60 * 1000,
+  getCases:           30 * 1000,
   getLookups:        30 * 60 * 1000,
   getUsers:           5 * 60 * 1000,
 }
