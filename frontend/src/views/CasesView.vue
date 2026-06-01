@@ -89,6 +89,27 @@
       </div>
     </div>
 
+    <!-- ── Offline notice ── -->
+    <div v-if="offlineMode"
+      class="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
+      <div class="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+        <span class="text-lg">📶</span>
+      </div>
+      <div>
+        <p class="text-sm font-semibold text-amber-800">You are currently offline</p>
+        <p class="text-xs text-amber-600 mt-0.5">
+          The case list cannot be loaded without internet. Any new cases you create will be
+          saved locally and synced automatically when you reconnect.
+        </p>
+      </div>
+    </div>
+
+    <!-- ── Error notice ── -->
+    <div v-if="error"
+      class="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-4">
+      <p class="text-sm text-red-700">{{ error }}</p>
+    </div>
+
     <!-- Table -->
     <div class="card overflow-hidden">
 
@@ -266,6 +287,8 @@ import {
 const auth = useAuthStore()
 const cases = ref([])
 const loading = ref(true)
+const offlineMode = ref(false)
+const error = ref(null)
 const page = ref(1)
 const pageSize = 20
 
@@ -288,8 +311,19 @@ function clearFilters() {
 }
 
 onMounted(async () => {
-  cases.value = await api('getCases')
-  loading.value = false
+  try {
+    const data = await api('getCases')
+    cases.value = data || []
+  } catch (e) {
+    if (e.message === 'OFFLINE') {
+      cases.value = []
+      offlineMode.value = true
+    } else {
+      error.value = e.message
+    }
+  } finally {
+    loading.value = false
+  }
 })
 
 const filtered = computed(() =>
