@@ -44,6 +44,11 @@
           <XMarkIcon class="w-3.5 h-3.5" /> Clear
         </button>
       </div>
+      <button @click="refreshCases" :disabled="loading"
+        class="btn-secondary text-xs py-2 flex-shrink-0">
+        <ArrowPathIcon class="w-3.5 h-3.5" :class="loading ? 'animate-spin' : ''" />
+        Refresh
+      </button>
       <button @click="exportCSV" class="btn-secondary text-xs py-2 flex-shrink-0">
         <ArrowDownTrayIcon class="w-3.5 h-3.5" /> Export CSV
       </button>
@@ -288,7 +293,7 @@ import { getPendingActions } from '@/services/offlineQueue'
 import {
   MagnifyingGlassIcon, FolderOpenIcon, ChevronRightIcon,
   ChevronLeftIcon, ChevronDownIcon, ArrowDownTrayIcon,
-  XMarkIcon, UserIcon,
+  XMarkIcon, UserIcon, ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 
 // ── State ─────────────────────────────────────────────────────
@@ -305,13 +310,12 @@ const filterClass = ref('')
 const filterSex = ref('')
 const sortBy = ref('date_intake_desc')
 
-// ── Watch: reload when coming back online ─────────────────────
 watch(isOnline, async (online) => {
   if (online && offlineMode.value) {
     offlineMode.value = false
     error.value = null
-    // Wait for sync to complete first
     await new Promise(resolve => setTimeout(resolve, 4000))
+    cases.value = []        // ← ADD
     loading.value = true
     try {
       const data = await api('getCases', {}, { skipCache: true })
@@ -324,11 +328,10 @@ watch(isOnline, async (online) => {
   }
 })
 
-// ── Watch: reload after sync completes ───────────────────────
 watch(syncedAt, async () => {
   if (!syncedAt.value) return
-  // Wait 3 seconds for Apps Script to finish writing to the sheet
   await new Promise(resolve => setTimeout(resolve, 3000))
+  cases.value = []        // ← ADD
   loading.value = true
   try {
     const data = await api('getCases', {}, { skipCache: true })
@@ -365,6 +368,25 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+
+async function refreshCases() {
+  cases.value = []
+  error.value = null
+  loading.value = true
+  try {
+    const data = await api('getCases', {}, { skipCache: true })
+    cases.value = data || []
+  } catch (e) {
+    if (e.message === 'OFFLINE') {
+      offlineMode.value = true
+    } else {
+      error.value = e.message
+    }
+  } finally {
+    loading.value = false
+  }
+}
 
 // ── Computed ──────────────────────────────────────────────────
 const hasFilters = computed(() =>
