@@ -281,7 +281,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { isOnline } from '@/composables/useSync'
+import { isOnline, syncedAt } from '@/composables/useSync'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/services/api'
 import { getPendingActions } from '@/services/offlineQueue'
@@ -312,13 +312,27 @@ watch(isOnline, async (online) => {
     error.value = null
     loading.value = true
     try {
-      const data = await api('getCases')
+      const data = await api('getCases', {}, { skipCache: true })
       cases.value = data || []
     } catch (e) {
       error.value = e.message
     } finally {
       loading.value = false
     }
+  }
+})
+
+// ── Watch: reload after sync completes ───────────────────────
+watch(syncedAt, async () => {
+  if (!syncedAt.value) return
+  loading.value = true
+  try {
+    const data = await api('getCases', {}, { skipCache: true })
+    cases.value = data || []
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    loading.value = false
   }
 })
 
