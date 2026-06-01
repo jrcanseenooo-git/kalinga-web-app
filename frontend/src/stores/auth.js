@@ -22,13 +22,19 @@ export const useAuthStore = defineStore("auth", () => {
   async function loginWithGoogle(credential) {
     loading.value = true;
     try {
-      // Decode locally only for display purposes (name, picture)
-      // The backend verifies the JWT signature via tokeninfo API
       const profile = decodeCredential(credential);
       token.value = credential;
       localStorage.setItem("cefmu_token", credential);
 
       const me = await api("getMe");
+
+      // If backend returned a long-lived ses_ token, use that instead
+      // of the Google JWT which expires in 1 hour
+      if (me.session_token) {
+        token.value = me.session_token;
+        localStorage.setItem("cefmu_token", me.session_token);
+      }
+
       user.value = {
         email: profile.email,
         name: profile.name,
