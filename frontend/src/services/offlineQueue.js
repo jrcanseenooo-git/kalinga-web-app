@@ -1,7 +1,11 @@
 import { openDB } from 'idb'
+import { ref } from 'vue'
 
 const DB_NAME = 'kalinga_offline'
 const STORE   = 'pending_actions'
+
+// ── Shared reactive count ─────────────────────────────────────
+export const pendingCount = ref(0)
 
 async function getDb() {
   return openDB(DB_NAME, 1, {
@@ -11,9 +15,13 @@ async function getDb() {
   })
 }
 
+export async function refreshCount() {
+  const db = await getDb()
+  pendingCount.value = await db.count(STORE)
+}
+
 export async function queueAction(action, payload) {
   const db = await getDb()
-  // Serialize to plain JSON and back to strip Vue reactivity proxies
   const cleanPayload = JSON.parse(JSON.stringify(payload))
   await db.add(STORE, {
     action,
@@ -21,6 +29,7 @@ export async function queueAction(action, payload) {
     queued_at: new Date().toISOString(),
     status: 'pending'
   })
+  await refreshCount()
 }
 
 export async function getPendingActions() {
