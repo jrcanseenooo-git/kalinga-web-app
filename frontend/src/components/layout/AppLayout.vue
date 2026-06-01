@@ -84,20 +84,22 @@
 
         <div class="ml-auto flex items-center gap-3">
 
+          <!-- ── Install App button ── -->
+          <button v-if="canInstall" @click="installApp" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full
+             bg-brand-600 text-white hover:bg-brand-700 transition-colors">
+            📲 Install App
+          </button>
+
           <!-- ── Sync / Connectivity Status Pill ── -->
           <div
             class="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full transition-all duration-300"
             :class="isOnline
               ? (pendingCount > 0 ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700')
-              : 'bg-amber-50 text-amber-700'"
-          >
+              : 'bg-amber-50 text-amber-700'">
             <!-- dot -->
-            <span
-              class="w-2 h-2 rounded-full flex-shrink-0"
-              :class="isOnline
-                ? (isSyncing ? 'bg-blue-400 animate-pulse' : pendingCount > 0 ? 'bg-blue-500' : 'bg-emerald-500')
-                : 'bg-amber-400 animate-pulse'"
-            />
+            <span class="w-2 h-2 rounded-full flex-shrink-0" :class="isOnline
+              ? (isSyncing ? 'bg-blue-400 animate-pulse' : pendingCount > 0 ? 'bg-blue-500' : 'bg-emerald-500')
+              : 'bg-amber-400 animate-pulse'" />
             <!-- label -->
             <span v-if="!isOnline">
               Offline{{ pendingCount > 0 ? ` · ${pendingCount} pending` : '' }}
@@ -107,12 +109,8 @@
             <span v-else>Online</span>
 
             <!-- Manual sync button — only shown when online and there are pending items -->
-            <button
-              v-if="isOnline && pendingCount > 0 && !isSyncing"
-              @click="flushQueue"
-              class="ml-0.5 text-blue-500 hover:text-blue-700 transition-colors"
-              title="Sync now"
-            >
+            <button v-if="isOnline && pendingCount > 0 && !isSyncing" @click="flushQueue"
+              class="ml-0.5 text-blue-500 hover:text-blue-700 transition-colors" title="Sync now">
               <ArrowPathIcon class="w-3.5 h-3.5" />
             </button>
           </div>
@@ -128,15 +126,14 @@
             <PlusIcon class="w-3.5 h-3.5" />
             New Case
           </RouterLink>
+
         </div>
       </header>
 
       <!-- Offline banner — shown when offline -->
       <Transition name="slide-down">
-        <div
-          v-if="!isOnline"
-          class="bg-amber-50 border-b border-amber-200 px-6 py-2 flex items-center gap-2 text-xs text-amber-800"
-        >
+        <div v-if="!isOnline"
+          class="bg-amber-50 border-b border-amber-200 px-6 py-2 flex items-center gap-2 text-xs text-amber-800">
           <WifiIcon class="w-4 h-4 text-amber-500 flex-shrink-0" />
           <span>
             <strong>You are offline.</strong>
@@ -185,6 +182,7 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { usePWA } from '@/composables/usePWA'
 import { isOnline, isSyncing, pendingCount, flushQueue } from '@/composables/useSync'
 import {
   Squares2X2Icon,
@@ -205,6 +203,7 @@ import {
 const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
+const { canInstall, installApp } = usePWA()
 
 const showLogoutModal = ref(false)
 const sidebarOpen = ref(false)
@@ -250,11 +249,11 @@ const pageTitle = computed(() => {
 
 const roleBadge = computed(() => {
   const map = {
-    admin:          { label: 'System Admin',   class: 'bg-purple-100 text-purple-700' },
-    case_worker:    { label: 'Case Worker',    class: 'bg-blue-100 text-blue-700' },
-    fo_user:        { label: 'Field Office',   class: 'bg-indigo-100 text-indigo-700' },
+    admin: { label: 'System Admin', class: 'bg-purple-100 text-purple-700' },
+    case_worker: { label: 'Case Worker', class: 'bg-blue-100 text-blue-700' },
+    fo_user: { label: 'Field Office', class: 'bg-indigo-100 text-indigo-700' },
     lgu_supervisor: { label: 'LGU Supervisor', class: 'bg-amber-100 text-amber-700' },
-    cpu_monitor:    { label: 'CPU Monitor',    class: 'bg-green-100 text-green-700' },
+    cpu_monitor: { label: 'CPU Monitor', class: 'bg-green-100 text-green-700' },
   }
   return map[auth.role] || { label: auth.role, class: 'bg-gray-100 text-gray-600' }
 })
@@ -265,6 +264,7 @@ const roleBadge = computed(() => {
 .slide-down-leave-active {
   transition: all 0.3s ease;
 }
+
 .slide-down-enter-from,
 .slide-down-leave-to {
   opacity: 0;
