@@ -304,7 +304,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { isOnline, syncedAt } from '@/composables/useSync'
 import { useAuthStore } from '@/stores/auth'
-import { api } from '@/services/api'
+import { api, invalidateCache } from '@/services/api'
 import { getPendingActions } from '@/services/offlineQueue'
 import {
   MagnifyingGlassIcon, FolderOpenIcon, ChevronRightIcon,
@@ -348,8 +348,11 @@ const filterClass = ref('')
 const filterSex = ref('')
 const sortBy = ref('date_intake_desc')
 
-// ── Helper: fetch fresh cases, updating the table live ───────
+// ── Helper: force-clear cache then fetch fresh from DB ───────
+// Always wipes the in-memory cache before fetching so we never
+// serve a stale snapshot, especially important right after sync.
 async function _reloadCases({ showLoading = false } = {}) {
+  invalidateCache('getCases')       // wipe cache FIRST
   if (showLoading) { cases.value = []; loading.value = true }
   error.value = null
   try {
@@ -368,20 +371,19 @@ async function _reloadCases({ showLoading = false } = {}) {
   }
 }
 
-// When connectivity is restored — reload immediately, no delay
+// When connectivity is restored — reload immediately
 watch(isOnline, async (online) => {
   if (!online) { offlineMode.value = true; return }
   await _reloadCases({ showLoading: true })
 })
 
-// When offline queue finishes syncing — reload immediately
-// Then retry twice (2s, 4s) because Apps Script can be slow to commit
+// When offline queue finishes syncing — reload with retries
+// Apps Script can take 3–6 seconds to make a new row readable
+// so we reload immediately, then retry at 3s and 6s intervals
 watch(syncedAt, async (newVal) => {
   if (!newVal) return
-  // Immediate reload — fast backends land here
   await _reloadCases({ showLoading: true })
-  // Retries — ensures slow App Script writes are caught
-  for (const delay of [2000, 4000]) {
+  for (const delay of [3000, 6000]) {
     await new Promise(r => setTimeout(r, delay))
     if (!isOnline.value) break
     await _reloadCases()
@@ -394,14 +396,13 @@ let autoRefreshTimer = null
 onMounted(async () => {
   loading.value = true
   try {
-    // Always fetch fresh on mount — skipCache ensures we always
-    // see the latest data from the database, not a stale snapshot
+    // Always fetch fresh on mount — wipe cache first
+    invalidateCache('getCases')
     const data = await api('getCases', {}, { skipCache: true })
     cases.value = data || []
   } catch (e) {
     if (e.message === 'OFFLINE') {
       offlineMode.value = true
-      // Load pending entries from IndexedDB to show while offline
       const queued = await getPendingActions()
       cases.value = queued
         .filter(item => item.action === 'createCase')
@@ -419,20 +420,12 @@ onMounted(async () => {
   }
 })
 
-// ── Auto-refresh every 30 seconds while on this page ─────────
+// ── Auto-refresh every 10 seconds while on this page ─────────
 onMounted(() => {
   autoRefreshTimer = setInterval(async () => {
     if (!isOnline.value || offlineMode.value) return
-    // Use revalidate so UI updates without loading flicker
-    api('getCases', {}, {
-      skipCache: true,
-      revalidate(fresh) {
-        cases.value = fresh || []
-      }
-    }).then(fresh => {
-      cases.value = fresh || []
-    }).catch(() => { })
-  }, 10 * 1000)  // 10s — fast enough to feel real-time
+    await _reloadCases()
+  }, 10 * 1000)
 })
 
 onUnmounted(() => {
