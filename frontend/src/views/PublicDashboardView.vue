@@ -18,7 +18,7 @@
           <img src="/logo-white.png" alt="Kalinga" class="h-10 w-auto drop-shadow-lg" />
           <div class="h-8 w-px bg-white/20"></div>
           <div>
-            <p class="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">CEFMU Registry</p>
+            <p class="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">CEFMU Dashboard</p>
             <p class="text-white font-semibold text-sm">Department of Social Welfare and Development</p>
           </div>
         </div>
@@ -26,8 +26,7 @@
         <div class="flex items-end justify-between gap-6">
           <div>
             <p class="text-white/50 text-xs leading-relaxed max-w-lg">
-              Aggregate figures on Children in Especially Difficult Circumstances, including cases of child marriage,
-              early union, and related issues.
+              Aggregate figures including cases of child marriage, early union, and related issues.
             </p>
             <!-- Disclaimer -->
             <div
@@ -228,7 +227,7 @@
         <div class="flex items-center justify-between py-4 border-t border-gray-100">
           <div class="flex items-center gap-3">
             <img src="/logo-purple.png" alt="Kalinga" class="h-7 w-auto opacity-50" />
-            <p class="text-xs text-gray-400">DSWD Kalinga Program | CEFMU Registry System</p>
+            <p class="text-xs text-gray-400">DSWD Kalinga Program | CEFMU Dashboard</p>
           </div>
           <div class="flex items-center gap-4">
             <div class="flex items-center gap-1.5">
