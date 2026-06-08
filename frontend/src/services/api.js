@@ -51,6 +51,10 @@ function getToken() {
 }
 
 async function _fetch(action, params = {}) {
+  // Throw a recognisable error when offline so callers can
+  // show cached / queued data instead of a generic error banner
+  if (!navigator.onLine) throw new Error('OFFLINE')
+
   const url = new URL(BASE_URL)
   url.searchParams.set('action', action)
   url.searchParams.set('token', getToken())
