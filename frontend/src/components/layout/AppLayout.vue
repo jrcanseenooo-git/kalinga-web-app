@@ -190,6 +190,7 @@ import {
   QuestionMarkCircleIcon,
   FolderOpenIcon,
   PlusCircleIcon,
+  ArrowDownTrayIcon,
   ArrowRightOnRectangleIcon,
   UsersIcon,
   GlobeAltIcon,
