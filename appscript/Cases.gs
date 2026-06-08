@@ -10,6 +10,25 @@ const FAMILY_COLS = [
 ];
 
 // ── Helpers ───────────────────────────────────────────────────
+
+// Bust the getCases server-side cache for this user so the next
+// getCases call reads fresh data from the sheet, not a 60s stale snapshot.
+// Called after every write that changes the case list.
+function _bustCasesCache(userEmail, userRole) {
+  try {
+    var cache = CacheService.getScriptCache();
+    // The cache key pattern is: cases_<role>_<email>_<status>
+    // We can't enumerate all status variants, so we remove the most
+    // common ones. An empty status suffix covers the default (all).
+    var bases = [
+      'cases_' + userRole + '_' + userEmail + '_',
+      'cases_' + userRole + '_' + userEmail + '_active',
+      'cases_' + userRole + '_' + userEmail + '_closed',
+    ];
+    cache.removeAll(bases);
+  } catch(e) {}
+}
+
 function _getSheet(name) {
   return SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(name);
 }
@@ -220,6 +239,7 @@ function createCase(params, user) {
       region:       params.region       || '',
     });
   }
+  _bustCasesCache(user.email, user.role);
   _bustDashboardCache(user.email, user.role);
   _logActivity(user.email, 'CREATE_CASE', case_id);
   return _output({ case_id });
@@ -258,6 +278,7 @@ function updateCase(params, user) {
   });
   // Bust case cache so next load is fresh
   try { CacheService.getScriptCache().remove('case_' + params.case_id + '_' + user.role); } catch(e) {}
+  _bustCasesCache(user.email, user.role);
   _bustDashboardCache(user.email, user.role);
   _logActivity(user.email, 'UPDATE_CASE', params.case_id);
   return _output({ updated: true });
@@ -277,6 +298,7 @@ function closeCase(params, user) {
   sheet.getRange(sheetRow, headers.indexOf('date_closed') + 1).setValue(now);
   sheet.getRange(sheetRow, headers.indexOf('updated_at')  + 1).setValue(now);
   try { CacheService.getScriptCache().remove('case_' + params.case_id + '_' + user.role); } catch(e) {}
+  _bustCasesCache(user.email, user.role);
   _bustDashboardCache(user.email, user.role);
   _logActivity(user.email, 'CLOSE_CASE', params.case_id);
   return _output({ closed: true });
@@ -296,6 +318,7 @@ function reopenCase(params, user) {
   sheet.getRange(sheetRow, headers.indexOf('date_closed') + 1).setValue('');
   sheet.getRange(sheetRow, headers.indexOf('updated_at')  + 1).setValue(now);
   try { CacheService.getScriptCache().remove('case_' + params.case_id + '_' + user.role); } catch(e) {}
+  _bustCasesCache(user.email, user.role);
   _bustDashboardCache(user.email, user.role);
   _logActivity(user.email, 'REOPEN_CASE', params.case_id);
   return _output({ reopened: true });
