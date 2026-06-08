@@ -250,7 +250,7 @@
             : 'border-gray-100 bg-gray-50'">
 
             <p class="text-xs font-semibold text-gray-600">
-              {{ editingMemberIndex !== null ? '✏️ Editing family member' : '➕ Add family member' }}
+              {{ editingMemberIndex !== null ? 'Editing family member' : '➕ Add family member' }}
             </p>
 
             <!-- Row 1: Name + Relationship + Sex (3 cols) -->
@@ -284,7 +284,7 @@
                   @change="onMemberBirthdateChange" />
               </div>
               <div>
-                <label class="block text-xs text-gray-400 mb-1 ml-0.5">Age (auto)</label>
+                <label class="block text-xs text-gray-400 mb-1 ml-0.5">Age</label>
                 <input :value="memberComputedAge" readonly placeholder="-"
                   class="field text-xs bg-gray-50 text-gray-400 cursor-not-allowed" />
               </div>
@@ -301,7 +301,7 @@
             <div class="flex gap-2 pt-0.5">
               <button type="button" @click="saveMember"
                 class="text-xs bg-brand-600 text-white px-4 py-1.5 rounded-lg hover:bg-brand-700 font-semibold transition-colors">
-                {{ editingMemberIndex !== null ? '✓ Update member' : '+ Add member' }}
+                {{ editingMemberIndex !== null ? 'Update member' : 'Add member' }}
               </button>
               <button type="button" @click="cancelEditMember"
                 class="text-xs border border-gray-200 text-gray-600 px-4 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">
