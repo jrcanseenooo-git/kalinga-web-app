@@ -165,13 +165,13 @@ const normalizedData = computed(() => {
 const hasData = computed(() => Object.values(normalizedData.value).some(v => v > 0))
 const maxVal = computed(() => Math.max(1, ...Object.values(normalizedData.value)))
 const legendShades = computed(() =>
-  [0.1, 0.25, 0.45, 0.65, 0.85, 1].map(t => d3.interpolate('#e9e4ff', '#4a2e85')(t))
+  [0.1, 0.25, 0.45, 0.65, 0.85, 1].map(t => d3.interpolate('#9b8ec4', '#2d1760')(t))
 )
 
 function getColor(region) {
   const count = normalizedData.value[region] || 0
-  if (count === 0) return '#f0f0f5'
-  return d3.interpolate('#c4b5e3', '#3d2070')(count / maxVal.value)
+  if (count === 0) return '#e5e3e8'
+  return d3.interpolate('#7b6aad', '#2d1760')(count / maxVal.value)
 }
 
 function shortName(psgcName) {
