@@ -751,7 +751,7 @@ async function doSubmit() {
     if (isEdit.value) {
       const result = await apiPost('updateCase', { case_id: route.params.id, ...payload })
 
-      if (result?.offline) {
+      if (result?._offline) {
         // Queued offline — go back to case detail, it will show stale cached data
         showConfirm.value = false
         offlineNotice.value = 'Changes saved offline and will sync when you reconnect.'
@@ -764,7 +764,7 @@ async function doSubmit() {
     } else {
       const result = await apiPost('createCase', payload)
 
-      if (result?.offline) {
+      if (result?._offline) {
         // Queued offline — go back to cases list
         showConfirm.value = false
         offlineNotice.value = 'Case saved offline and will sync automatically when you reconnect.'
