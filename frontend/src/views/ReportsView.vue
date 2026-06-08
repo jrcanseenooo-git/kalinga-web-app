@@ -130,7 +130,7 @@
           <button @click="exportCSV"
             class="flex items-center gap-1.5 text-xs font-semibold border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
             <ArrowDownTrayIcon class="w-3.5 h-3.5" />
-            Export CSV
+            Export
           </button>
           <button @click="exportSummaryCSV"
             class="flex items-center gap-1.5 text-xs font-semibold bg-brand-600 text-white px-3 py-1.5 rounded-lg hover:bg-brand-700 transition-colors">
