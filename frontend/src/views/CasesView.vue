@@ -348,40 +348,43 @@ const filterClass = ref('')
 const filterSex = ref('')
 const sortBy = ref('date_intake_desc')
 
-watch(isOnline, async (online) => {
-  if (online && offlineMode.value) {
-    offlineMode.value = false
-    error.value = null
-    await new Promise(resolve => setTimeout(resolve, 4000))
-    cases.value = []
-    loading.value = true
-    try {
-      const data = await api('getCases', {}, { skipCache: true })
-      cases.value = data || []
-      error.value = null   // clear any stale error on success
-    } catch (e) {
-      // Only show error if we have no cases to display
-      if (!cases.value.length) error.value = e.message
-    } finally {
-      loading.value = false
-    }
-  }
-})
-
-watch(syncedAt, async () => {
-  if (!syncedAt.value) return
+// ── Helper: fetch fresh cases, updating the table live ───────
+async function _reloadCases({ showLoading = false } = {}) {
+  if (showLoading) { cases.value = []; loading.value = true }
   error.value = null
-  await new Promise(resolve => setTimeout(resolve, 3000))
-  loading.value = true
   try {
     const data = await api('getCases', {}, { skipCache: true })
     cases.value = data || []
-    error.value = null   // clear any stale error on success
+    offlineMode.value = false
+    error.value = null
   } catch (e) {
-    // Only show error if we have no cases to display
-    if (!cases.value.length) error.value = e.message
+    if (e.message === 'OFFLINE') {
+      offlineMode.value = true
+    } else if (!cases.value.length) {
+      error.value = e.message
+    }
   } finally {
-    loading.value = false
+    if (showLoading) loading.value = false
+  }
+}
+
+// When connectivity is restored — reload immediately, no delay
+watch(isOnline, async (online) => {
+  if (!online) { offlineMode.value = true; return }
+  await _reloadCases({ showLoading: true })
+})
+
+// When offline queue finishes syncing — reload immediately
+// Then retry twice (2s, 4s) because Apps Script can be slow to commit
+watch(syncedAt, async (newVal) => {
+  if (!newVal) return
+  // Immediate reload — fast backends land here
+  await _reloadCases({ showLoading: true })
+  // Retries — ensures slow App Script writes are caught
+  for (const delay of [2000, 4000]) {
+    await new Promise(r => setTimeout(r, delay))
+    if (!isOnline.value) break
+    await _reloadCases()
   }
 })
 
@@ -389,12 +392,11 @@ watch(syncedAt, async () => {
 let autoRefreshTimer = null
 
 onMounted(async () => {
+  loading.value = true
   try {
-    const data = await api('getCases', {}, {
-      revalidate(fresh) {
-        cases.value = fresh || []
-      }
-    })
+    // Always fetch fresh on mount — skipCache ensures we always
+    // see the latest data from the database, not a stale snapshot
+    const data = await api('getCases', {}, { skipCache: true })
     cases.value = data || []
   } catch (e) {
     if (e.message === 'OFFLINE') {
@@ -430,7 +432,7 @@ onMounted(() => {
     }).then(fresh => {
       cases.value = fresh || []
     }).catch(() => { })
-  }, 30 * 1000)
+  }, 10 * 1000)  // 10s — fast enough to feel real-time
 })
 
 onUnmounted(() => {
