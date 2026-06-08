@@ -121,17 +121,11 @@ function _saveFamilyMembers(caseId, members, caseSnapshot) {
 }
 
 // ── getCases ─────────────────────────────────────────────────
-// Single openById, cached per role+user (60s TTL)
+// No server-side caching — always reads fresh from sheet so
+// newly synced cases appear immediately after offline submission.
 function getCases(e, user) {
-  const status   = e.parameter.status || '';
-  const cacheKey = 'cases_' + user.role + '_' + user.email + '_' + status;
-
-  // Try cache first
-  const cached = _cacheGet(cacheKey);
-  if (cached) return _output(cached);
-
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  let cases = _sheetToObjectsSS(ss, CASE_SHEET);
+  const status = e.parameter.status || '';
+  let cases = _sheetToObjects(_getSheet(CASE_SHEET));
 
   if (user.role === 'case_worker')         cases = cases.filter(c => c.case_worker_email === user.email);
   else if (user.role === 'fo_user')        cases = cases.filter(c => c.region   === user.region);
@@ -139,9 +133,6 @@ function getCases(e, user) {
   else if (user.role === 'cpu_monitor')    cases = cases.filter(c => c.lgu_code === user.lgu_code);
 
   if (status) cases = cases.filter(c => c.status === status);
-
-  // Cache for 60 seconds
-  _cachePut(cacheKey, cases, 60);
   return _output(cases);
 }
 
