@@ -87,7 +87,8 @@
           <!-- ── Install App button ── -->
           <button v-if="canInstall" @click="installApp" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full
              bg-brand-600 text-white hover:bg-brand-700 transition-colors">
-            Install APP
+            <span class="material-symbols-outlined">arrow_downward</span>
+             INSTALL APP
           </button>
 
           <!-- ── Sync / Connectivity Status Pill ── -->
