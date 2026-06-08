@@ -14,9 +14,9 @@
           </legend>
 
           <div class="grid grid-cols-4 gap-3">
-            <FormField label="Last name" v-model="form.client_last" required />
             <FormField label="First name" v-model="form.client_first" required />
             <FormField label="Middle name" v-model="form.client_mi" />
+            <FormField label="Last name" v-model="form.client_last" required />
             <FormField label="Suffix" v-model="form.suffix" placeholder="Jr., Sr., III" />
           </div>
 
@@ -32,7 +32,28 @@
           </div>
 
           <div class="grid grid-cols-4 gap-3">
-            <FormField label="Contact Number" v-model="form.phone" />
+            <!-- Contact Number — PH mobile 09xxxxxxxxx, 11 digits only -->
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1.5">Contact Number</label>
+              <input
+                :value="form.phone"
+                type="tel"
+                inputmode="numeric"
+                maxlength="11"
+                placeholder="09XXXXXXXXX"
+                @input="onPhoneInput"
+                @keydown="onPhoneKeydown"
+                :class="[
+                  'w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 bg-white',
+                  phoneError ? 'border-red-300 focus:ring-red-400' : 'border-gray-200 focus:ring-brand-500'
+                ]"
+              />
+              <p v-if="phoneError" class="text-xs text-red-500 mt-1">{{ phoneError }}</p>
+              <!-- <p v-else-if="form.phone && form.phone.length < 11" class="text-xs text-gray-400 mt-1">
+                {{ 11 - form.phone.length }} more digit{{ 11 - form.phone.length !== 1 ? 's' : '' }} needed
+              </p>
+              <p v-else class="text-xs text-gray-400 mt-1">Format: 09XXXXXXXXX (11 digits)</p> -->
+            </div>
             <SelectField label="Religion" v-model="form.religion" :options="religions" />
             <SelectField label="IP Category" v-model="form.ip_category" :options="ipCategories" />
             <SelectField label="Highest Education Attainment" v-model="form.education" :options="educLevels" />
@@ -439,6 +460,37 @@ const saving = ref(false)
 const error = ref(null)
 const sameAddress = ref(false)
 
+// ─── Phone validation ─────────────────────────────────────────
+const phoneError = ref('')
+
+function onPhoneKeydown(e) {
+  // Allow: backspace, delete, tab, escape, arrows, home, end
+  const allowed = ['Backspace','Delete','Tab','Escape','ArrowLeft','ArrowRight','Home','End']
+  if (allowed.includes(e.key)) return
+  // Block anything that is not a digit
+  if (!/[0-9]/.test(e.key)) {
+    e.preventDefault()
+  }
+}
+
+function onPhoneInput(e) {
+  // Strip any non-digit that slipped through (e.g. paste)
+  const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 11)
+  // Force the input display value to the cleaned string
+  e.target.value = digits
+  form.value.phone = digits
+
+  if (!digits) {
+    phoneError.value = ''
+  } else if (!digits.startsWith('09')) {
+    phoneError.value = 'Must start with 09.'
+  } else if (digits.length === 11) {
+    phoneError.value = ''
+  } else {
+    phoneError.value = ''   // show hint instead of error while typing
+  }
+}
+
 // ─── Helpers ──────────────────────────────────────────────────
 function toDateInput(val) {
   if (!val) return ''
@@ -676,6 +728,12 @@ function confirmSubmit() {
   if (!form.value.classification.length) {
     error.value = 'Please select at least one classification.'
     return
+  }
+  if (form.value.phone) {
+    if (form.value.phone.length !== 11 || !form.value.phone.startsWith('09')) {
+      error.value = 'Contact number must be an 11-digit Philippine mobile number starting with 09 (e.g. 09171234567).'
+      return
+    }
   }
   error.value = null
   showConfirm.value = true
