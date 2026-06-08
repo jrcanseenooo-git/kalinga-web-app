@@ -1,5 +1,5 @@
 import { ref, onMounted, onUnmounted } from 'vue'
-import { getAll, remove, pendingCount as queuedCount } from '@/services/offlineQueue'
+import { getAll, remove, pendingCount as queuedCount, refreshCount as refreshQueueCount } from '@/services/offlineQueue'
 import { apiPost } from '@/services/api'
 
 // ── Module-level singletons shared across all consumers ───────
@@ -11,7 +11,10 @@ export const syncedAt     = ref(null) // Date of last successful flush
 
 // ── Refresh the pending badge count ──────────────────────────
 async function refreshCount() {
-  pendingCount.value = await queuedCount()
+  // queuedCount is a reactive ref from offlineQueue — read its .value directly
+  pendingCount.value = queuedCount.value
+  // Also trigger a DB count refresh so the ref stays accurate
+  await refreshQueueCount()
 }
 
 // ── Flush queue — replay each item against the live API ──────
@@ -28,8 +31,8 @@ export async function flushQueue() {
 
   for (const item of items) {
     try {
-      await apiPost(item.action, item.body)
-      await remove(item.key)
+      await apiPost(item.action, item.payload)
+      await remove(item.id)
     } catch (err) {
       const isNetworkError =
         !navigator.onLine ||
@@ -39,7 +42,7 @@ export async function flushQueue() {
       if (!isNetworkError) {
         // Backend rejected it (not a network issue) — drop to avoid infinite loop
         console.warn(`[sync] Dropping failed queue item (${item.action}):`, err.message)
-        await remove(item.key)
+        await remove(item.id)
       } else {
         // True network loss mid-flush — stop and retry on next reconnect
         console.warn('[sync] Network lost mid-flush, will retry on reconnect.')
@@ -70,7 +73,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('online',  handleOnline)
   window.addEventListener('offline', handleOffline)
   // Initial count
-  queuedCount().then(n => { pendingCount.value = n })
+  refreshQueueCount().then(() => { pendingCount.value = queuedCount.value })
   // Attempt flush on first load in case items were queued in a prior session
   if (navigator.onLine) flushQueue()
 }
