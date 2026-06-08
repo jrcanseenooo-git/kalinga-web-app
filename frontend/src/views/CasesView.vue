@@ -49,7 +49,7 @@
         Refresh
       </button>
       <button @click="exportCSV" class="btn-secondary text-xs py-2 flex-shrink-0">
-        <ArrowDownTrayIcon class="w-3.5 h-3.5" /> Export CSV
+        <ArrowDownTrayIcon class="w-3.5 h-3.5" /> Export
       </button>
     </div>
 
@@ -190,7 +190,7 @@
               class="hover:bg-brand-50/40 transition-colors cursor-pointer group"
               @click="$router.push(`/cases/${c.case_id}`)">
 
-              <!-- Client -->
+              <!-- Client — name masked by default for data privacy -->
               <td class="px-5 py-3.5">
                 <div class="flex items-center gap-3">
                   <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
@@ -198,9 +198,26 @@
                     {{ c.client_first?.charAt(0) }}{{ c.client_last?.charAt(0) }}
                   </div>
                   <div>
-                    <p class="font-semibold text-gray-900 leading-tight">
-                      {{ c.client_last }}, {{ c.client_first }}
-                      <span v-if="c.client_mi" class="text-gray-400">{{ c.client_mi.charAt(0) }}.</span>
+                    <p class="font-semibold text-gray-900 leading-tight flex items-center gap-1.5">
+                      <span v-if="revealedIds.has(c.case_id)">
+                        {{ c.client_last }}, {{ c.client_first }}
+                        <span v-if="c.client_mi" class="text-gray-400">{{ c.client_mi.charAt(0) }}.</span>
+                      </span>
+                      <span v-else class="font-mono tracking-widest text-gray-400 text-xs select-none">
+                        {{ maskName(c.client_last) }}, {{ maskName(c.client_first) }}
+                      </span>
+                      <button
+                        @click.stop="toggleReveal(c.case_id)"
+                        :title="revealedIds.has(c.case_id) ? 'Hide name' : 'Click to reveal name'"
+                        class="text-gray-300 hover:text-brand-500 transition-colors flex-shrink-0 ml-1">
+                        <svg v-if="!revealedIds.has(c.case_id)" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                        </svg>
+                        <svg v-else class="w-3.5 h-3.5 text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                        </svg>
+                      </button>
                     </p>
                     <p class="text-xs text-gray-400 font-mono mt-0.5">{{ c.case_id }}</p>
                   </div>
@@ -297,6 +314,28 @@ import {
 
 // ── State ─────────────────────────────────────────────────────
 const auth = useAuthStore()
+
+// ── Privacy: name masking ─────────────────────────────────────
+// Names are hidden by default in the list. Each row has an eye
+// icon — click it to reveal that specific client's name.
+// Revealed names are only in memory and reset on page refresh.
+const revealedIds = ref(new Set())
+
+function maskName(name) {
+  if (!name) return '***'
+  // Show first letter + mask the rest: e.g. "Santos" → "S*****"
+  return name.charAt(0) + '*'.repeat(Math.max(name.length - 1, 3))
+}
+
+function toggleReveal(caseId) {
+  const next = new Set(revealedIds.value)
+  if (next.has(caseId)) {
+    next.delete(caseId)
+  } else {
+    next.add(caseId)
+  }
+  revealedIds.value = next
+}
 const cases = ref([])
 const loading = ref(true)
 const offlineMode = ref(false)
@@ -476,7 +515,23 @@ function fmtDate(d) {
   return d ? new Date(d).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : '-'
 }
 
-function exportCSV() {
+async function exportCSV() {
+  // ── Audit trail: log export to backend before downloading ──
+  try {
+    await apiPost('logExport', {
+      exported_count: filtered.value.length,
+      filters: {
+        status: statusFilter.value,
+        cefmu_type: typeFilter.value,
+        sex: sexFilter.value,
+        search: search.value,
+      },
+    })
+  } catch (e) {
+    // Non-blocking — proceed with export even if audit log fails
+    console.warn('[export] Audit log failed:', e.message)
+  }
+
   const headers = ['Case ID', 'Last Name', 'First Name', 'Sex', 'Age', 'Classification', 'CEFMU Type', 'Region', 'Province', 'City/Muni', 'Date Intake', 'Status']
   const rows = filtered.value.map(c => [
     c.case_id, c.client_last, c.client_first, c.sex, c.age,
