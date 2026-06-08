@@ -63,7 +63,7 @@ export const ipCategories = [
 export const relationships = [
   'Self', 'Spouse', 'Son', 'Daughter', 'Father', 'Mother',
   'Brother', 'Sister', 'Grandfather', 'Grandmother',
-  'Uncle', 'Aunt', 'Nephew', 'Niece', 'Cousin', 'Other'
+  'Uncle', 'Aunt', 'Nephew', 'Niece', 'Cousin'
 ]
 
 export const cefmuTypes = [
