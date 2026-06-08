@@ -1,5 +1,5 @@
 import { ref, onMounted, onUnmounted } from 'vue'
-import { getAll, remove, pendingCount as queuedCount, refreshCount as refreshQueueCount } from '@/services/offlineQueue'
+import { getAll, remove, pendingCount as queuedCount } from '@/services/offlineQueue'
 import { apiPost } from '@/services/api'
 
 // ── Module-level singletons shared across all consumers ───────
@@ -11,10 +11,7 @@ export const syncedAt     = ref(null) // Date of last successful flush
 
 // ── Refresh the pending badge count ──────────────────────────
 async function refreshCount() {
-  // queuedCount is a reactive ref from offlineQueue — read its .value directly
   pendingCount.value = queuedCount.value
-  // Also trigger a DB count refresh so the ref stays accurate
-  await refreshQueueCount()
 }
 
 // ── Flush queue — replay each item against the live API ──────
@@ -73,7 +70,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('online',  handleOnline)
   window.addEventListener('offline', handleOffline)
   // Initial count
-  refreshQueueCount().then(() => { pendingCount.value = queuedCount.value })
+  queuedCount().then(n => { pendingCount.value = n })
   // Attempt flush on first load in case items were queued in a prior session
   if (navigator.onLine) flushQueue()
 }
