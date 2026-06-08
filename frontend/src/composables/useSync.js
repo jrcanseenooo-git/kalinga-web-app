@@ -10,11 +10,11 @@ export const syncedAt     = ref(null)
 
 // ── Refresh the pending badge count ──────────────────────────
 async function refreshCount() {
-  await refreshQueueCount()              // triggers DB count update
-  pendingCount.value = queuedCount.value // read the updated ref value
+  await refreshQueueCount()
+  pendingCount.value = queuedCount.value
 }
 
-// ── Flush queue — replay each item against the live API ──────
+// ── Flush queue ───────────────────────────────────────────────
 export async function flushQueue() {
   if (!navigator.onLine || isSyncing.value) return
 
@@ -28,8 +28,8 @@ export async function flushQueue() {
 
   for (const item of items) {
     try {
-      await apiPost(item.action, item.payload)   // item.payload — not item.body
-      await deleteAction(item.id)                // item.id — not item.key
+      await apiPost(item.action, item.payload)
+      await deleteAction(item.id)
     } catch (err) {
       const isNetworkError =
         !navigator.onLine ||
@@ -59,10 +59,8 @@ function handleOffline() { isOnline.value = false }
 if (typeof window !== 'undefined') {
   window.addEventListener('online',  handleOnline)
   window.addEventListener('offline', handleOffline)
-  // Seed the pending count — refreshQueueCount() is async,
-  // read .value after it resolves (never call queuedCount as a function)
+  // queuedCount is a ref — read .value, never call it as a function
   refreshQueueCount().then(() => { pendingCount.value = queuedCount.value })
-  // Flush any items queued in a previous session
   if (navigator.onLine) flushQueue()
 }
 
