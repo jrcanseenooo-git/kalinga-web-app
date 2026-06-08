@@ -114,10 +114,10 @@ function getCases(e, user) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   let cases = _sheetToObjectsSS(ss, CASE_SHEET);
 
-  if (user.role === 'case_worker')    cases = cases.filter(c => c.case_worker_email === user.email);
-  else if (user.role === 'fo_user')   cases = cases.filter(c => c.region   === user.region);
+  if (user.role === 'case_worker')         cases = cases.filter(c => c.case_worker_email === user.email);
+  else if (user.role === 'fo_user')        cases = cases.filter(c => c.region   === user.region);
   else if (user.role === 'lgu_supervisor') cases = cases.filter(c => c.province === user.province);
-  else if (user.role === 'cpu_monitor')    cases = cases.filter(c => c.lgu_code  === user.lgu_code);
+  else if (user.role === 'cpu_monitor')    cases = cases.filter(c => c.lgu_code === user.lgu_code);
 
   if (status) cases = cases.filter(c => c.status === status);
 
@@ -171,6 +171,23 @@ function createCase(params, user) {
   if (user.role === 'cpu_monitor') return _error('Forbidden', 403);
   const sheet   = _getSheet(CASE_SHEET);
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+  // ── Offline dedup check ──────────────────────────────────
+  // If the payload has an offline_id AND the column exists in the sheet,
+  // check if this submission was already processed (e.g. a sync retry).
+  const offlineIdCol = headers.indexOf('offline_id');
+  if (params.offline_id && offlineIdCol !== -1) {
+    const allData = sheet.getDataRange().getValues();
+    for (let i = 1; i < allData.length; i++) {
+      if (allData[i][offlineIdCol] === params.offline_id) {
+        const existingId = allData[i][headers.indexOf('case_id')];
+        Logger.log('createCase: duplicate offline_id, returning existing case_id=' + existingId);
+        return _output({ case_id: existingId });
+      }
+    }
+  }
+  // ────────────────────────────────────────────────────────
+
   const now     = new Date().toISOString();
   const case_id = 'CEFMU-' + Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyyMM') +
                   '-' + Utilities.getUuid().replace(/-/g,'').substr(0,6).toUpperCase();
@@ -184,6 +201,7 @@ function createCase(params, user) {
       case 'updated_at':        return now;
       case 'date_closed':       return '';
       case 'family_members':    return members.length ? JSON.stringify(members) : '[]';
+      case 'offline_id':        return params.offline_id || '';
       default:
         const val = params[col];
         if (val === undefined || val === null) return '';
@@ -223,7 +241,7 @@ function updateCase(params, user) {
   const members   = _parseFamilyMembers(params.family_members);
   headers.forEach((col, i) => {
     if (protected_.has(col)) return;
-    if (col === 'updated_at')    { sheet.getRange(sheetRow, i + 1).setValue(now); return; }
+    if (col === 'updated_at')     { sheet.getRange(sheetRow, i + 1).setValue(now); return; }
     if (col === 'family_members') { sheet.getRange(sheetRow, i + 1).setValue(members.length ? JSON.stringify(members) : '[]'); return; }
     if (params[col] !== undefined) {
       const val = params[col];
@@ -255,9 +273,9 @@ function closeCase(params, user) {
   if (rowIdx === -1) return _error('Case not found', 404);
   const sheetRow = rowIdx + 2;
   const now = new Date().toISOString();
-  sheet.getRange(sheetRow, headers.indexOf('status')     + 1).setValue('closed');
-  sheet.getRange(sheetRow, headers.indexOf('date_closed')+ 1).setValue(now);
-  sheet.getRange(sheetRow, headers.indexOf('updated_at') + 1).setValue(now);
+  sheet.getRange(sheetRow, headers.indexOf('status')      + 1).setValue('closed');
+  sheet.getRange(sheetRow, headers.indexOf('date_closed') + 1).setValue(now);
+  sheet.getRange(sheetRow, headers.indexOf('updated_at')  + 1).setValue(now);
   try { CacheService.getScriptCache().remove('case_' + params.case_id + '_' + user.role); } catch(e) {}
   _bustDashboardCache(user.email, user.role);
   _logActivity(user.email, 'CLOSE_CASE', params.case_id);
@@ -274,9 +292,9 @@ function reopenCase(params, user) {
   if (rowIdx === -1) return _error('Case not found', 404);
   const sheetRow = rowIdx + 2;
   const now = new Date().toISOString();
-  sheet.getRange(sheetRow, headers.indexOf('status')     + 1).setValue('active');
-  sheet.getRange(sheetRow, headers.indexOf('date_closed')+ 1).setValue('');
-  sheet.getRange(sheetRow, headers.indexOf('updated_at') + 1).setValue(now);
+  sheet.getRange(sheetRow, headers.indexOf('status')      + 1).setValue('active');
+  sheet.getRange(sheetRow, headers.indexOf('date_closed') + 1).setValue('');
+  sheet.getRange(sheetRow, headers.indexOf('updated_at')  + 1).setValue(now);
   try { CacheService.getScriptCache().remove('case_' + params.case_id + '_' + user.role); } catch(e) {}
   _bustDashboardCache(user.email, user.role);
   _logActivity(user.email, 'REOPEN_CASE', params.case_id);
@@ -343,6 +361,7 @@ function updateNote(params, user) {
   try { CacheService.getScriptCache().remove('case_' + params.case_id + '_' + user.role); } catch(e) {}
   return _output({ updated: true });
 }
+
 // ── Case Locations Sheet ──────────────────────────────────────
 const LOCATION_SHEET = 'case_locations';
 const LOCATION_COLS  = [
@@ -371,13 +390,12 @@ function _ensureLocationSheet() {
   return sheet;
 }
 
-// ── saveLocation — called when case worker drags and saves map pin ──
+// ── saveLocation ─────────────────────────────────────────────
 function saveLocation(params, user) {
   if (!['admin','case_worker','fo_user','lgu_supervisor'].includes(user.role)) {
     return _error('Forbidden', 403);
   }
 
-  // Get the case to fill in client details
   const ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
   const cases = _sheetToObjectsSS(ss, CASE_SHEET);
   const found = cases.find(c => c.case_id === params.case_id);
@@ -387,34 +405,33 @@ function saveLocation(params, user) {
   const now    = new Date().toISOString();
   const loc_id = 'LOC-' + Utilities.getUuid().replace(/-/g,'').substr(0,8).toUpperCase();
 
-  // Permanent address fields — handle both prov_ and per_ prefixes
-  const permRegion   = found.per_region   || found.prov_region   || '';
-  const permProvince = found.per_province || found.prov_province || '';
-  const permCityMuni = found.per_city_muni|| found.prov_city_muni|| '';
-  const permBarangay = found.per_barangay || found.prov_barangay || '';
+  const permRegion   = found.per_region    || found.prov_region    || '';
+  const permProvince = found.per_province  || found.prov_province  || '';
+  const permCityMuni = found.per_city_muni || found.prov_city_muni || '';
+  const permBarangay = found.per_barangay  || found.prov_barangay  || '';
 
   const row = LOCATION_COLS.map(col => {
     switch (col) {
-      case 'location_id':          return loc_id;
-      case 'case_id':              return params.case_id;
-      case 'client_last':          return found.client_last  || '';
-      case 'client_first':         return found.client_first || '';
-      case 'client_mi':            return found.client_mi    || '';
-      case 'perm_region':          return permRegion;
-      case 'perm_province':        return permProvince;
-      case 'perm_city_muni':       return permCityMuni;
-      case 'perm_barangay':        return permBarangay;
-      case 'current_lgu':          return params.current_lgu          || found.city_muni || '';
-      case 'current_province':     return params.current_province     || found.province  || '';
-      case 'current_region':       return params.current_region       || found.region    || '';
-      case 'current_barangay':     return params.current_barangay     || found.barangay  || '';
-      case 'current_address_notes':return params.current_address_notes|| '';
-      case 'latitude':             return params.latitude  || '';
-      case 'longitude':            return params.longitude || '';
-      case 'recorded_by':          return user.email;
-      case 'recorded_at':          return now;
-      case 'transfer_reason':      return params.transfer_reason || 'Location update';
-      default:                     return '';
+      case 'location_id':           return loc_id;
+      case 'case_id':               return params.case_id;
+      case 'client_last':           return found.client_last  || '';
+      case 'client_first':          return found.client_first || '';
+      case 'client_mi':             return found.client_mi    || '';
+      case 'perm_region':           return permRegion;
+      case 'perm_province':         return permProvince;
+      case 'perm_city_muni':        return permCityMuni;
+      case 'perm_barangay':         return permBarangay;
+      case 'current_lgu':           return params.current_lgu           || found.city_muni || '';
+      case 'current_province':      return params.current_province      || found.province  || '';
+      case 'current_region':        return params.current_region        || found.region    || '';
+      case 'current_barangay':      return params.current_barangay      || found.barangay  || '';
+      case 'current_address_notes': return params.current_address_notes || '';
+      case 'latitude':              return params.latitude  || '';
+      case 'longitude':             return params.longitude || '';
+      case 'recorded_by':           return user.email;
+      case 'recorded_at':           return now;
+      case 'transfer_reason':       return params.transfer_reason || 'Location update';
+      default:                      return '';
     }
   });
 
@@ -423,7 +440,7 @@ function saveLocation(params, user) {
   return _output({ location_id: loc_id, saved: true });
 }
 
-// ── getLocations — returns full location history for a case ──
+// ── getLocations ─────────────────────────────────────────────
 function getLocations(e, user) {
   const case_id = e.parameter.case_id;
   const sheet   = _getSheet(LOCATION_SHEET);
@@ -436,11 +453,11 @@ function getLocations(e, user) {
   return _output(locations);
 }
 
-// ── getLatestLocation — returns only the most recent location ──
+// ── getLatestLocation ─────────────────────────────────────────
 function getLatestLocation(e, user) {
-  const case_id   = e.parameter.case_id;
-  const cacheKey  = 'loc_' + case_id;
-  const cached    = _cacheGet(cacheKey);
+  const case_id  = e.parameter.case_id;
+  const cacheKey = 'loc_' + case_id;
+  const cached   = _cacheGet(cacheKey);
   if (cached) return _output(cached);
 
   const sheet = _getSheet(LOCATION_SHEET);
