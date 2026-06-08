@@ -38,7 +38,7 @@ export const provinces = {
   '17': ['Marinduque', 'Occidental Mindoro', 'Oriental Mindoro', 'Palawan', 'Romblon'],
 }
 
-export const civilStatuses = ['Single', 'Married', 'Widowed', 'Separated', 'Live-in', 'Unknown']
+export const civilStatuses = ['Single', 'Married', 'Widowed', 'Separated', 'Live-in']
 
 export const religions = [
   'Roman Catholic', 'Islam', 'Iglesia ni Cristo', 'Protestant',
@@ -57,7 +57,7 @@ export const ipCategories = [
   'Not an IP', 'Aeta', 'Agta', 'Ati', 'Badjao', 'B\'laan',
   'Ibaloi', 'Ifugao', 'Kalinga', 'Kankanaey', 'Lumad',
   'Mangyan', 'Manobo', 'Maranao', 'Subanen', 'T\'boli',
-  'Tagbanwa', 'Tausug', 'Other IP Group'
+  'Tagbanwa', 'Tausug'
 ]
 
 export const relationships = [
@@ -69,7 +69,7 @@ export const relationships = [
 export const cefmuTypes = [
   'Child marriage', 'Early union', 'Forced marriage',
   'Teenage pregnancy', 'Child abuse', 'Child labor',
-  'Child trafficking', 'Other'
+  'Child trafficking'
 ]
 
-export const admissionModes = ['Walk-in', 'Referral', 'Outreach', 'Online', 'Phone', 'Other']
+export const admissionModes = ['Walk-in', 'Referral', 'Outreach', 'Online', 'Phone']
