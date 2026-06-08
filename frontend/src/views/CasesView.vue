@@ -353,13 +353,15 @@ watch(isOnline, async (online) => {
     offlineMode.value = false
     error.value = null
     await new Promise(resolve => setTimeout(resolve, 4000))
-    cases.value = []        // ← ADD
+    cases.value = []
     loading.value = true
     try {
       const data = await api('getCases', {}, { skipCache: true })
       cases.value = data || []
+      error.value = null   // clear any stale error on success
     } catch (e) {
-      error.value = e.message
+      // Only show error if we have no cases to display
+      if (!cases.value.length) error.value = e.message
     } finally {
       loading.value = false
     }
@@ -368,14 +370,16 @@ watch(isOnline, async (online) => {
 
 watch(syncedAt, async () => {
   if (!syncedAt.value) return
+  error.value = null
   await new Promise(resolve => setTimeout(resolve, 3000))
-  cases.value = []        // ← ADD
   loading.value = true
   try {
     const data = await api('getCases', {}, { skipCache: true })
     cases.value = data || []
+    error.value = null   // clear any stale error on success
   } catch (e) {
-    error.value = e.message
+    // Only show error if we have no cases to display
+    if (!cases.value.length) error.value = e.message
   } finally {
     loading.value = false
   }
