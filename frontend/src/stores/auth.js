@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { decodeCredential } from "vue3-google-login";
-import { api } from "@/services/api";
+import { api, apiPost } from "@/services/api";
 import { clearAll as clearOfflineQueue } from "@/services/offlineQueue";
 
 export const useAuthStore = defineStore("auth", () => {
@@ -64,10 +64,15 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   function logout() {
-    // Wipe encrypted offline queue — encrypted data keyed to this
-    // session token is unrecoverable after logout anyway, and
-    // clearing prevents stale encrypted blobs from accumulating.
+    apiPost('logout').catch(() => {})
     clearOfflineQueue().catch(() => {})
+    user.value = null;
+    token.value = null;
+    localStorage.removeItem("cefmu_token");
+    localStorage.removeItem("cefmu_user");
+  }
+
+  function handleSessionExpired() {
     user.value = null;
     token.value = null;
     localStorage.removeItem("cefmu_token");
@@ -87,5 +92,6 @@ export const useAuthStore = defineStore("auth", () => {
     loginWithGoogle,
     loginWithSession,
     logout,
+    handleSessionExpired,
   };
 });

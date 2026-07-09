@@ -1,4 +1,50 @@
 <template>
+  <!-- P1: Privacy Notice Modal — shown before new intake -->
+  <Teleport to="body">
+    <Transition name="modal">
+      <div v-if="showPrivacyNotice"
+        class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+        @click.self="goBack">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[80vh] overflow-y-auto">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
+              <ShieldCheckIcon class="w-5 h-5 text-brand-600" />
+            </div>
+            <h3 class="font-bold text-gray-900">Privacy Notice</h3>
+          </div>
+          <div class="text-sm text-gray-700 space-y-3 mb-6">
+            <p class="italic text-gray-600 border-l-4 border-brand-200 pl-3">
+              The Department of Social Welfare and Development collects and processes your personal and,
+              when necessary, sensitive personal information for Project Kalinga intake, case management,
+              service/referral documentation, monitoring, reporting, validation, accountability and other
+              purposes authorized by law or official program mandate.
+            </p>
+            <p>Only authorized personnel will access this information based on their assigned role and official duties.</p>
+            <p>Information will be protected through organizational, physical and technical safeguards and retained only
+              for the period allowed by applicable records, legal and program requirements.</p>
+            <p>Data privacy rights may be exercised subject to applicable laws and policies by contacting the
+              designated DPO/project focal person.</p>
+          </div>
+          <label class="flex items-start gap-2 mb-4 cursor-pointer">
+            <input type="checkbox" v-model="privacyAcknowledged"
+              class="mt-0.5 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
+            <span class="text-sm text-gray-700">
+              I acknowledge that I have read and understood the privacy notice, and I confirm that the data subject
+              has been informed of this notice before data collection.
+            </span>
+          </label>
+          <div class="flex gap-3 justify-end">
+            <button type="button" @click="goBack" class="btn-secondary">Cancel</button>
+            <button type="button" @click="acceptPrivacy" :disabled="!privacyAcknowledged"
+              class="btn-primary" :class="{ 'opacity-50 cursor-not-allowed': !privacyAcknowledged }">
+              Proceed to Intake
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+
   <div class="max-w-4xl mx-auto">
     <div class="bg-white rounded-xl border p-6 space-y-6 overflow-hidden">
       <div class="flex items-center justify-between">
@@ -405,6 +451,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, apiPost } from '@/services/api'
+import { ShieldCheckIcon } from '@heroicons/vue/24/outline'
 import FormField from '@/components/ui/FormField.vue'
 import SelectField from '@/components/ui/SelectField.vue'
 import ConfirmModal from '@/components/ui/ConfirmModal.vue'
@@ -459,6 +506,17 @@ const isEdit = computed(() => !!route.params.id && route.path.includes('edit'))
 const saving = ref(false)
 const error = ref(null)
 const sameAddress = ref(false)
+
+// P1: Privacy notice before intake
+const showPrivacyNotice = ref(false)
+const privacyAcknowledged = ref(false)
+
+function goBack() {
+  router.push('/cases')
+}
+function acceptPrivacy() {
+  showPrivacyNotice.value = false
+}
 
 // ─── Phone validation ─────────────────────────────────────────
 const phoneError = ref('')
@@ -638,6 +696,11 @@ watch(sameAddress, (checked) => {
 
 // ─── Load existing case for edit ──────────────────────────────
 onMounted(async () => {
+  // P1: Show privacy notice for new intakes
+  if (!isEdit.value) {
+    showPrivacyNotice.value = true
+  }
+
   if (isEdit.value) {
     const data = await api('getCase', { case_id: route.params.id })
     const dateFields = ['birthdate', 'date_intake', 'referral_date']

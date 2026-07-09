@@ -9,6 +9,7 @@ const CaseFormView = () => import("@/views/CaseFormView.vue");
 const UsersView = () => import("@/views/UsersView.vue");
 const PublicDashboardView = () => import("@/views/PublicDashboardView.vue");
 const ReportsView = () => import("@/views/ReportsView.vue");
+const AuditLogsView = () => import("@/views/AuditLogsView.vue");
 const FaqView = () => import("@/views/FaqView.vue");
 const NotFoundView = () => import("@/views/NotFoundView.vue");
 
@@ -37,7 +38,7 @@ const routes = [
     path: "/cases/new",
     name: "case-new",
     component: CaseFormView,
-    meta: { auth: true, roles: ["admin", "case_worker"] },
+    meta: { auth: true, roles: ["case_worker"] },
   },
   {
     path: "/cases/:id",
@@ -58,6 +59,12 @@ const routes = [
     path: "/users",
     name: "users",
     component: UsersView,
+    meta: { auth: true, roles: ["admin"] },
+  },
+  {
+    path: "/audit-logs",
+    name: "audit-logs",
+    component: AuditLogsView,
     meta: { auth: true, roles: ["admin"] },
   },
   {

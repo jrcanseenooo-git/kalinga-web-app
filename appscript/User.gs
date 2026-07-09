@@ -29,6 +29,7 @@ function createUser(params, user) {
     params.region    || '',
     params.province  || '',
   ]);
+  _logActivity(user.email, 'CREATE_USER', email);
   return _output({ created: true });
 }
 
@@ -46,6 +47,7 @@ function updateUser(params, user) {
   const provinceIdx = headers.indexOf('province');
   if (regionIdx >= 0)   sheet.getRange(sheetRow, regionIdx + 1).setValue(params.region || '');
   if (provinceIdx >= 0) sheet.getRange(sheetRow, provinceIdx + 1).setValue(params.province || '');
+  _logActivity(user.email, 'UPDATE_USER', params.email);
   return _output({ updated: true });
 }
 
@@ -58,11 +60,16 @@ function toggleUser(params, user) {
   const sheetRow = rowIdx + 2;
   const active = params.active === 'true' || params.active === true;
   sheet.getRange(sheetRow, headers.indexOf('active') + 1).setValue(active);
+  _logActivity(user.email, active ? 'ACTIVATE_USER' : 'DEACTIVATE_USER', params.email);
   return _output({ toggled: true });
 }
 
 function setUserPassword(params, user) {
   if (user.role !== 'admin') return _error('Forbidden', 403);
+  var pw = params.password || '';
+  if (pw.length < 8) return _error('Password must be at least 8 characters');
+  if (!/[A-Z]/.test(pw)) return _error('Password must contain at least one uppercase letter');
+  if (!/[0-9]/.test(pw)) return _error('Password must contain at least one number');
 
   const sheet = _getSheet('users');
   const [headers, ...rows] = sheet.getDataRange().getValues();
@@ -84,5 +91,6 @@ function setUserPassword(params, user) {
   sheet.getRange(sheetRow, idx.salt + 1).setValue(salt);
   sheet.getRange(sheetRow, idx.must_change_password + 1).setValue(true);
 
+  _logActivity(user.email, 'SET_PASSWORD', params.email);
   return _output({ set: true });
 }

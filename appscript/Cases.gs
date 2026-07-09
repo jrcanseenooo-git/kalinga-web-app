@@ -178,7 +178,8 @@ function getCase(e, user) {
 
 // ── createCase ───────────────────────────────────────────────
 function createCase(params, user) {
-  if (user.role === 'cpu_monitor') return _error('Forbidden', 403);
+  // P0: Only case_worker can create cases (enforced in ROLE_PERMISSIONS too)
+  if (user.role !== 'case_worker') return _error('Forbidden', 403);
   const sheet   = _getSheet(CASE_SHEET);
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
@@ -359,7 +360,7 @@ function addNote(params, user) {
 function updateNote(params, user) {
   if (user.role === 'cpu_monitor') return _error('Forbidden', 403);
   const sheet = _getSheet('progress_notes');
-  if (!sheet) return _error('progress_notes sheet not found', 404);
+  if (!sheet) return _error('Resource not available', 500);
   const allData = sheet.getDataRange().getValues();
   const headers = allData[0];
   const rows    = allData.slice(1);

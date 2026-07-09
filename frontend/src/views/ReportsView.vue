@@ -127,12 +127,12 @@
           </div>
         </div>
         <div class="flex gap-2">
-          <button @click="exportCSV"
+          <button @click="requestExport('csv')"
             class="flex items-center gap-1.5 text-xs font-semibold border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
             <ArrowDownTrayIcon class="w-3.5 h-3.5" />
             Export
           </button>
-          <button @click="exportSummaryCSV"
+          <button @click="requestExport('summary')"
             class="flex items-center gap-1.5 text-xs font-semibold bg-brand-600 text-white px-3 py-1.5 rounded-lg hover:bg-brand-700 transition-colors">
             <DocumentChartBarIcon class="w-3.5 h-3.5" />
             Summary report
@@ -264,14 +264,63 @@
     </div>
 
   </div>
+
+  <!-- Export confirmation modal (P1) -->
+  <Teleport to="body">
+    <Transition name="modal">
+      <div v-if="showExportModal"
+        class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 animate-fade-in"
+        @click.self="showExportModal = false">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-fade-in-up space-y-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center flex-shrink-0">
+              <ShieldExclamationIcon class="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <h3 class="font-bold text-gray-900 text-sm">Export confirmation</h3>
+              <p class="text-xs text-gray-500 mt-0.5">This export contains sensitive personal data protected under the Data Privacy Act.</p>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Purpose of export <span class="text-red-500">*</span></label>
+            <select v-model="exportPurpose" class="input-base w-full">
+              <option value="">Select purpose…</option>
+              <option value="Official reporting">Official reporting</option>
+              <option value="Case review">Case review</option>
+              <option value="Data analysis">Data analysis</option>
+              <option value="Audit/compliance">Audit / compliance</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div v-if="exportPurpose === 'Other'">
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Specify purpose</label>
+            <input v-model="exportPurposeOther" type="text" class="input-base w-full" placeholder="Describe the purpose…" />
+          </div>
+
+          <p class="text-xs text-gray-400">
+            By proceeding, you confirm this export is for an authorized purpose and that you will handle the data in accordance with DSWD data privacy policies.
+          </p>
+
+          <div class="flex gap-3 justify-end pt-2 border-t border-gray-100">
+            <button @click="showExportModal = false" class="btn-secondary text-sm">Cancel</button>
+            <button @click="confirmExport" :disabled="!exportPurposeValid" class="btn-primary text-sm disabled:opacity-40">
+              Confirm & export
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { api } from '@/services/api'
+import { api, apiPost } from '@/services/api'
 import { regions as regionList, provinces as provincesMap, cefmuTypes } from '@/data/psgc'
 import {
-  ArrowDownTrayIcon, DocumentChartBarIcon, ChevronDownIcon
+  ArrowDownTrayIcon, DocumentChartBarIcon, ChevronDownIcon, ShieldExclamationIcon
 } from '@heroicons/vue/24/outline'
 
 const loading   = ref(false)
@@ -279,6 +328,39 @@ const generated = ref(false)
 const cases     = ref([])
 const page      = ref(1)
 const pageSize  = 50
+
+const showExportModal   = ref(false)
+const exportPurpose     = ref('')
+const exportPurposeOther = ref('')
+const pendingExportType = ref('')
+
+const exportPurposeValid = computed(() => {
+  if (!exportPurpose.value) return false
+  if (exportPurpose.value === 'Other' && !exportPurposeOther.value.trim()) return false
+  return true
+})
+
+function requestExport(type) {
+  pendingExportType.value = type
+  exportPurpose.value = ''
+  exportPurposeOther.value = ''
+  showExportModal.value = true
+}
+
+async function confirmExport() {
+  const purpose = exportPurpose.value === 'Other' ? exportPurposeOther.value.trim() : exportPurpose.value
+  showExportModal.value = false
+
+  apiPost('logExport', {
+    export_type: pendingExportType.value,
+    purpose,
+    record_count: filtered.value.length,
+    filters: JSON.stringify(filters.value),
+  }).catch(() => {})
+
+  if (pendingExportType.value === 'csv') exportCSV()
+  else exportSummaryCSV()
+}
 
 const filters = ref({
   region: '', province: '', status: '', classification: '',

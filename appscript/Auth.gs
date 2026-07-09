@@ -71,9 +71,11 @@ function loginWithPassword(params) {
   if (computed !== hash) {
     const attempts = (parseInt(row[idx.failed_attempts]) || 0) + 1;
     sheet.getRange(sheetRow, idx.failed_attempts + 1).setValue(attempts);
+    _logActivity(email, 'LOGIN_FAILED', 'attempt ' + attempts);
     if (attempts >= 5) {
       const lockUntil = new Date(Date.now() + 15 * 60 * 1000).toISOString();
       sheet.getRange(sheetRow, idx.locked_until + 1).setValue(lockUntil);
+      _logActivity(email, 'ACCOUNT_LOCKED', '15 min lockout');
       return _error('Too many failed attempts. Account locked for 15 minutes.');
     }
     return _error(`Invalid email or password. ${5 - attempts} attempt(s) remaining.`);
@@ -88,6 +90,7 @@ function loginWithPassword(params) {
 
   _saveSession(sessionToken, email, sessionExpiry);
 
+  _logActivity(email, 'LOGIN_PASSWORD', '');
   return _output({
     session_token:        sessionToken,
     expires_at:           sessionExpiry,
@@ -161,6 +164,19 @@ function _getEmailFromSession(token) {
   if (new Date(row[idx.expires_at]) < new Date()) return null;
 
   return row[idx.email];
+}
+
+function _invalidateSession(token) {
+  var sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('sessions');
+  if (!sheet) return;
+  var data = sheet.getDataRange().getValues();
+  var tokenIdx = data[0].indexOf('token');
+  for (var i = data.length - 1; i >= 1; i--) {
+    if (data[i][tokenIdx] === token) {
+      sheet.deleteRow(i + 1);
+      return;
+    }
+  }
 }
 
 // Deletes rows whose expires_at is in the past.

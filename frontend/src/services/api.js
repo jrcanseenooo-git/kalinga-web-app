@@ -65,6 +65,14 @@ async function _fetch(action, params = {}) {
   })
   const res  = await fetch(url.toString())
   const json = await res.json()
+  if (json.status === 401) {
+    localStorage.removeItem('cefmu_token')
+    localStorage.removeItem('cefmu_user')
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login?expired=1'
+    }
+    throw new Error('Session expired')
+  }
   if (json.status !== 200) throw new Error(json.data?.error || 'API error')
   return json.data
 }
@@ -135,7 +143,9 @@ export async function apiPost(action, body = {}) {
     return { _offline: true }
   }
 
-  // ── Online path: normal request ───────────────────────────
+  // ── Online path ─
+  // Apps Script web apps redirect all requests via 302, which converts
+  // POST→GET in the browser. We must use GET with an encoded payload param.
   const url = new URL(BASE_URL)
   url.searchParams.set('action', action)
   url.searchParams.set('token', getToken())

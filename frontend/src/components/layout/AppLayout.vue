@@ -121,7 +121,7 @@
           </span>
 
           <!-- Quick new case button -->
-          <RouterLink v-if="auth.isAdmin || auth.isCaseWorker" to="/cases/new"
+          <RouterLink v-if="auth.isCaseWorker" to="/cases/new"
             class="btn-primary text-xs py-2 hidden sm:inline-flex">
             <PlusIcon class="w-3.5 h-3.5" />
             New Case
@@ -199,6 +199,7 @@ import {
   Bars3Icon,
   ArrowPathIcon,
   WifiIcon,
+  ShieldCheckIcon,
 } from '@heroicons/vue/24/outline'
 
 const auth = useAuthStore()
@@ -230,6 +231,7 @@ const navItems = computed(() => {
   ]
   if (auth.isAdmin) {
     items.push({ to: '/users', label: 'User Management', icon: UsersIcon })
+    items.push({ to: '/audit-logs', label: 'Audit Logs', icon: ShieldCheckIcon })
   }
   return items
 })
@@ -241,6 +243,7 @@ const pageTitle = computed(() => {
     '/cases/new': 'New Case',
     '/users': 'User Management',
     '/reports': 'Reports & Export',
+    '/audit-logs': 'Audit Logs',
     '/faq': 'Help & FAQ',
   }
   if (route.path.includes('/cases/') && route.path.includes('/edit')) return 'Edit Case'

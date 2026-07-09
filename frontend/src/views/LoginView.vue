@@ -187,7 +187,7 @@ import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { GoogleLogin } from 'vue3-google-login'
 import { useAuthStore } from '@/stores/auth'
-import { api } from '@/services/api'
+import { api, apiPost } from '@/services/api'
 import {
   EyeIcon,
   EyeSlashIcon,
@@ -202,7 +202,7 @@ const route = useRoute()
 const form = ref({ email: '', password: '' })
 const showPassword = ref(false)
 const logging = ref(false)
-const error = ref(null)
+const error = ref(route.query.expired ? 'Your session has expired. Please sign in again.' : null)
 
 const showChangePassword = ref(false)
 const newPassword = ref('')
@@ -236,7 +236,7 @@ async function handleEmailLogin() {
   logging.value = true
   error.value = null
   try {
-    const res = await api('loginWithPassword', {
+    const res = await apiPost('loginWithPassword', {
       email: form.value.email,
       password: form.value.password,
     })
