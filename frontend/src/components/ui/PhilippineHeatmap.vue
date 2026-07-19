@@ -105,6 +105,7 @@ const props = defineProps({
   data: { type: Object, default: () => ({}) },
   height: { type: Number, default: 480 },
 })
+const emit = defineEmits(['select-region'])
 
 const svgEl = ref(null)
 const mapContainer = ref(null)
@@ -224,6 +225,7 @@ function zoomToRegion(psgcName) {
 
 function selectRegion(psgcName) {
   selectedRegion.value = psgcName || null
+  emit('select-region', selectedRegion.value)
   // If the map isn't ready yet, zoom will be applied at the end of drawMap()
   if (mapReady) zoomToRegion(psgcName || null)
 }
@@ -234,7 +236,79 @@ function zoom(factor) {
 
 function resetZoom() {
   selectedRegion.value = null
+  emit('select-region', null)
   if (svgSel && zoomBeh) svgSel.transition().duration(500).call(zoomBeh.transform, d3.zoomIdentity)
+}
+
+function drawFallbackSummary() {
+  const w = svgEl.value.clientWidth || 400
+  const h = props.height
+  const entries = Object.entries(normalizedData.value)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+  const rows = entries.length ? entries : [['No regional data yet', 0]]
+  const max = Math.max(1, ...rows.map(([, value]) => value))
+
+  svgSel.append('text')
+    .attr('x', 24)
+    .attr('y', 34)
+    .attr('fill', '#374151')
+    .attr('font-size', 13)
+    .attr('font-weight', 700)
+    .text('Regional map unavailable')
+
+  svgSel.append('text')
+    .attr('x', 24)
+    .attr('y', 56)
+    .attr('fill', '#6b7280')
+    .attr('font-size', 11)
+    .text('Showing regional case counts while map data is offline.')
+
+  const row = svgSel.selectAll('g.fallback-row')
+    .data(rows)
+    .enter()
+    .append('g')
+    .attr('class', 'fallback-row')
+    .attr('transform', (_, index) => `translate(24, ${88 + index * 42})`)
+
+  row.append('text')
+    .attr('x', 0)
+    .attr('y', 0)
+    .attr('fill', '#4b5563')
+    .attr('font-size', 11)
+    .attr('font-weight', 600)
+    .text(([region]) => region.replace(/\s*\(.+\)/, ''))
+
+  row.append('rect')
+    .attr('x', 0)
+    .attr('y', 8)
+    .attr('width', w - 90)
+    .attr('height', 12)
+    .attr('rx', 6)
+    .attr('fill', '#ede9fe')
+
+  row.append('rect')
+    .attr('x', 0)
+    .attr('y', 8)
+    .attr('width', ([, value]) => Math.max(6, ((w - 90) * value) / max))
+    .attr('height', 12)
+    .attr('rx', 6)
+    .attr('fill', '#6b4aab')
+
+  row.append('text')
+    .attr('x', w - 72)
+    .attr('y', 19)
+    .attr('fill', '#111827')
+    .attr('font-size', 12)
+    .attr('font-weight', 700)
+    .text(([, value]) => value)
+
+  svgSel.append('text')
+    .attr('x', 24)
+    .attr('y', h - 24)
+    .attr('fill', '#9ca3af')
+    .attr('font-size', 10)
+    .text('Reconnect to load the interactive Philippine map.')
 }
 
 async function drawMap() {
@@ -252,8 +326,9 @@ async function drawMap() {
       const res = await fetch(GEOJSON_URL)
       geoData = await res.json()
     } catch (e) {
-      console.error('GeoJSON failed', e)
+      drawFallbackSummary()
       drawing = false
+      mapReady = true
       return
     }
   }

@@ -6,6 +6,25 @@ function getUsers(e, user) {
   return _output(safe);
 }
 
+// Validate an incoming permissions grant (array or JSON string) against the
+// server-side whitelist. Returns a JSON string safe to store. Anything not in
+// GRANTABLE_ACTIONS is silently dropped so the client can never widen access
+// beyond what the backend explicitly allows.
+function _sanitizePermissions(raw) {
+  var list = raw;
+  if (typeof raw === 'string') {
+    try { list = JSON.parse(raw); } catch (e) { list = []; }
+  }
+  if (!Array.isArray(list)) return '[]';
+  var clean = list.filter(function (a) {
+    return typeof a === 'string' && GRANTABLE_ACTIONS.indexOf(a) !== -1;
+  });
+  // De-duplicate
+  var seen = {};
+  clean = clean.filter(function (a) { return seen[a] ? false : (seen[a] = true); });
+  return JSON.stringify(clean);
+}
+
 function createUser(params, user) {
   if (user.role !== 'admin') return _error('Forbidden', 403);
   const email = (params.email || '').toLowerCase().trim();
@@ -29,6 +48,14 @@ function createUser(params, user) {
     params.region    || '',
     params.province  || '',
   ]);
+
+  // Persist per-user grants (if the permissions column exists).
+  const permIdx = headers.indexOf('permissions');
+  if (permIdx >= 0) {
+    sheet.getRange(sheet.getLastRow(), permIdx + 1)
+      .setValue(_sanitizePermissions(params.permissions));
+  }
+
   _logActivity(user.email, 'CREATE_USER', email);
   return _output({ created: true });
 }
@@ -47,8 +74,28 @@ function updateUser(params, user) {
   const provinceIdx = headers.indexOf('province');
   if (regionIdx >= 0)   sheet.getRange(sheetRow, regionIdx + 1).setValue(params.region || '');
   if (provinceIdx >= 0) sheet.getRange(sheetRow, provinceIdx + 1).setValue(params.province || '');
+  const permIdx = headers.indexOf('permissions');
+  // Only touch grants when the client actually sent them, so an older client
+  // that omits the field never wipes an existing user's grants.
+  if (permIdx >= 0 && params.permissions !== undefined) {
+    sheet.getRange(sheetRow, permIdx + 1).setValue(_sanitizePermissions(params.permissions));
+  }
   _logActivity(user.email, 'UPDATE_USER', params.email);
   return _output({ updated: true });
+}
+
+// ── One-time migration: add the `permissions` column to the users sheet ──
+// Run this once from the Apps Script editor after deploying. Idempotent —
+// safe to run more than once; it only adds the column if missing.
+function addPermissionsColumn() {
+  const sheet = _getSheet('users');
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  if (headers.indexOf('permissions') !== -1) {
+    Logger.log('permissions column already exists — nothing to do.');
+    return;
+  }
+  sheet.getRange(1, sheet.getLastColumn() + 1).setValue('permissions');
+  Logger.log('Added "permissions" column to users sheet.');
 }
 
 function toggleUser(params, user) {

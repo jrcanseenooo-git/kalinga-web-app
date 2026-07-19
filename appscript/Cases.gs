@@ -74,6 +74,65 @@ function _parseFamilyMembers(val) {
   return [];
 }
 
+function _rowToObject(headers, row) {
+  const obj = {};
+  headers.forEach((h, i) => { obj[h] = (row[i] === null || row[i] === undefined) ? '' : row[i]; });
+  return obj;
+}
+
+function _sameText(a, b) {
+  return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+}
+
+function _coverageLabel(user) {
+  if (!user) return '';
+  return [
+    user.role || '',
+    user.email || '',
+    user.lgu_code || '',
+    user.province || '',
+    user.region || '',
+  ].join('|');
+}
+
+function _caseCacheKey(prefix, caseId, user) {
+  return prefix + '_' + caseId + '_' + Utilities.base64EncodeWebSafe(_coverageLabel(user));
+}
+
+function _hasCoverageValue(user, key) {
+  return !!String(user && user[key] || '').trim();
+}
+
+function _canViewCase(found, user) {
+  if (!found || !user) return false;
+  if (user.role === 'admin') return true;
+  if (user.role === 'case_worker') return _sameText(found.case_worker_email, user.email);
+  if (user.role === 'fo_user') return _sameText(found.region, user.region);
+  if (user.role === 'lgu_supervisor') {
+    if (_hasCoverageValue(user, 'lgu_code')) return _sameText(found.lgu_code, user.lgu_code);
+    if (_hasCoverageValue(user, 'province')) return _sameText(found.province, user.province);
+    return false;
+  }
+  if (user.role === 'cpu_monitor') {
+    if (_hasCoverageValue(user, 'lgu_code')) return _sameText(found.lgu_code, user.lgu_code);
+    if (_hasCoverageValue(user, 'province')) return _sameText(found.province, user.province);
+    return false;
+  }
+  return false;
+}
+
+function _canOperateOnCase(found, user) {
+  if (!found || !user) return false;
+  if (user.role === 'case_worker')    return _sameText(found.case_worker_email, user.email);
+  if (user.role === 'fo_user')        return _sameText(found.region, user.region);
+  if (user.role === 'lgu_supervisor') {
+    if (_hasCoverageValue(user, 'lgu_code')) return _sameText(found.lgu_code, user.lgu_code);
+    if (_hasCoverageValue(user, 'province')) return _sameText(found.province, user.province);
+    return false;
+  }
+  return false;
+}
+
 // ── Save family members ───────────────────────────────────────
 function _saveFamilyMembers(caseId, members, caseSnapshot) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -127,10 +186,7 @@ function getCases(e, user) {
   const status = e.parameter.status || '';
   let cases = _sheetToObjects(_getSheet(CASE_SHEET));
 
-  if (user.role === 'case_worker')         cases = cases.filter(c => c.case_worker_email === user.email);
-  else if (user.role === 'fo_user')        cases = cases.filter(c => c.region   === user.region);
-  else if (user.role === 'lgu_supervisor') cases = cases.filter(c => c.province === user.province);
-  else if (user.role === 'cpu_monitor')    cases = cases.filter(c => c.lgu_code === user.lgu_code);
+  cases = cases.filter(c => _canViewCase(c, user));
 
   if (status) cases = cases.filter(c => c.status === status);
   return _output(cases);
@@ -142,7 +198,7 @@ function getCase(e, user) {
   const id = e.parameter.case_id;
 
   // Try cache (30s TTL — short enough for real-time feel)
-  const cacheKey = 'case_' + id + '_' + user.role;
+  const cacheKey = _caseCacheKey('case', id, user);
   const cached   = _cacheGet(cacheKey);
   if (cached) return _output(cached);
 
@@ -152,10 +208,10 @@ function getCase(e, user) {
   const found = cases.find(c => c.case_id === id);
   if (!found) return _error('Case not found', 404);
 
-  if (user.role === 'case_worker'    && found.case_worker_email !== user.email) return _error('Forbidden', 403);
-  if (user.role === 'fo_user'        && found.region   !== user.region)         return _error('Forbidden', 403);
-  if (user.role === 'lgu_supervisor' && found.province !== user.province)       return _error('Forbidden', 403);
-  if (user.role === 'cpu_monitor'    && found.lgu_code !== user.lgu_code)       return _error('Forbidden', 403);
+  if (!_canViewCase(found, user)) {
+    _logActivity(user.email, 'BLOCKED_GET_CASE', id);
+    return _error('Forbidden', 403);
+  }
 
   // All sub-reads reuse same ss reference — no extra openById calls
   found._services = _sheetToObjectsSS(ss, 'services')
@@ -173,13 +229,16 @@ function getCase(e, user) {
 
   // Cache result
   _cachePut(cacheKey, found, 30);
+  _logActivity(user.email, 'VIEW_CASE', id);
   return _output(found);
 }
 
 // ── createCase ───────────────────────────────────────────────
 function createCase(params, user) {
-  // P0: Only case_worker can create cases (enforced in ROLE_PERMISSIONS too)
-  if (user.role !== 'case_worker') return _error('Forbidden', 403);
+  // Defense-in-depth: the router already checked this, but re-verify here.
+  // Uses _checkPermission so admin-granted intake access is honored — a hard
+  // role check here would silently defeat per-user grants.
+  if (!_checkPermission('createCase', user)) return _error('Forbidden', 403);
   const sheet   = _getSheet(CASE_SHEET);
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
@@ -199,6 +258,10 @@ function createCase(params, user) {
   }
   // ────────────────────────────────────────────────────────
 
+  // Validate + sanitize admin-defined custom fields before persisting.
+  const cf = _validateCustomFields(params.custom_fields);
+  if (!cf.ok) return _error(cf.error);
+
   const now     = new Date().toISOString();
   const case_id = 'CEFMU-' + Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyyMM') +
                   '-' + Utilities.getUuid().replace(/-/g,'').substr(0,6).toUpperCase();
@@ -213,6 +276,7 @@ function createCase(params, user) {
       case 'date_closed':       return '';
       case 'family_members':    return members.length ? JSON.stringify(members) : '[]';
       case 'offline_id':        return params.offline_id || '';
+      case 'custom_fields':     return cf.value;
       default:
         const val = params[col];
         if (val === undefined || val === null) return '';
@@ -239,7 +303,7 @@ function createCase(params, user) {
 
 // ── updateCase ───────────────────────────────────────────────
 function updateCase(params, user) {
-  if (user.role === 'cpu_monitor') return _error('Forbidden', 403);
+  if (!_checkPermission('updateCase', user)) return _error('Forbidden', 403);
   const sheet   = _getSheet(CASE_SHEET);
   const allData = sheet.getDataRange().getValues();
   const headers = allData[0];
@@ -247,6 +311,19 @@ function updateCase(params, user) {
   const caseIdCol = headers.indexOf('case_id');
   const rowIdx    = rows.findIndex(r => String(r[caseIdCol]) === String(params.case_id));
   if (rowIdx === -1) return _error('Case not found', 404);
+  const found = _rowToObject(headers, rows[rowIdx]);
+  if (!_canOperateOnCase(found, user)) {
+    _logActivity(user.email, 'BLOCKED_UPDATE_CASE', params.case_id);
+    return _error('Forbidden', 403);
+  }
+  // Validate + sanitize admin-defined custom fields before persisting.
+  let cfValue = null;
+  if (params.custom_fields !== undefined) {
+    const cf = _validateCustomFields(params.custom_fields);
+    if (!cf.ok) return _error(cf.error);
+    cfValue = cf.value;
+  }
+
   const sheetRow  = rowIdx + 2;
   const now       = new Date().toISOString();
   const protected_ = new Set(['case_id','status','case_worker_email','date_closed','created_at']);
@@ -255,6 +332,7 @@ function updateCase(params, user) {
     if (protected_.has(col)) return;
     if (col === 'updated_at')     { sheet.getRange(sheetRow, i + 1).setValue(now); return; }
     if (col === 'family_members') { sheet.getRange(sheetRow, i + 1).setValue(members.length ? JSON.stringify(members) : '[]'); return; }
+    if (col === 'custom_fields')  { if (cfValue !== null) sheet.getRange(sheetRow, i + 1).setValue(cfValue); return; }
     if (params[col] !== undefined) {
       const val = params[col];
       const cellVal = Array.isArray(val) ? val.join(', ') : (typeof val === 'object' ? JSON.stringify(val) : String(val === null ? '' : val));
@@ -269,7 +347,7 @@ function updateCase(params, user) {
     region:       params.region       || rows[rowIdx][headers.indexOf('region')]       || '',
   });
   // Bust case cache so next load is fresh
-  try { CacheService.getScriptCache().remove('case_' + params.case_id + '_' + user.role); } catch(e) {}
+  try { CacheService.getScriptCache().remove(_caseCacheKey('case', params.case_id, user)); } catch(e) {}
   _bustCasesCache(user.email, user.role);
   _bustDashboardCache(user.email, user.role);
   _logActivity(user.email, 'UPDATE_CASE', params.case_id);
@@ -278,18 +356,23 @@ function updateCase(params, user) {
 
 // ── closeCase ────────────────────────────────────────────────
 function closeCase(params, user) {
-  if (user.role === 'cpu_monitor') return _error('Forbidden', 403);
+  if (!_checkPermission('closeCase', user)) return _error('Forbidden', 403);
   const sheet   = _getSheet(CASE_SHEET);
   const headers = sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0];
   const rows    = sheet.getRange(2,1,Math.max(sheet.getLastRow()-1,1),sheet.getLastColumn()).getValues();
   const rowIdx  = rows.findIndex(r => String(r[headers.indexOf('case_id')]) === String(params.case_id));
   if (rowIdx === -1) return _error('Case not found', 404);
+  const found = _rowToObject(headers, rows[rowIdx]);
+  if (!_canOperateOnCase(found, user)) {
+    _logActivity(user.email, 'BLOCKED_CLOSE_CASE', params.case_id);
+    return _error('Forbidden', 403);
+  }
   const sheetRow = rowIdx + 2;
   const now = new Date().toISOString();
   sheet.getRange(sheetRow, headers.indexOf('status')      + 1).setValue('closed');
   sheet.getRange(sheetRow, headers.indexOf('date_closed') + 1).setValue(now);
   sheet.getRange(sheetRow, headers.indexOf('updated_at')  + 1).setValue(now);
-  try { CacheService.getScriptCache().remove('case_' + params.case_id + '_' + user.role); } catch(e) {}
+  try { CacheService.getScriptCache().remove(_caseCacheKey('case', params.case_id, user)); } catch(e) {}
   _bustCasesCache(user.email, user.role);
   _bustDashboardCache(user.email, user.role);
   _logActivity(user.email, 'CLOSE_CASE', params.case_id);
@@ -298,18 +381,23 @@ function closeCase(params, user) {
 
 // ── reopenCase ───────────────────────────────────────────────
 function reopenCase(params, user) {
-  if (user.role === 'cpu_monitor') return _error('Forbidden', 403);
+  if (!_checkPermission('reopenCase', user)) return _error('Forbidden', 403);
   const sheet   = _getSheet(CASE_SHEET);
   const headers = sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0];
   const rows    = sheet.getRange(2,1,Math.max(sheet.getLastRow()-1,1),sheet.getLastColumn()).getValues();
   const rowIdx  = rows.findIndex(r => String(r[headers.indexOf('case_id')]) === String(params.case_id));
   if (rowIdx === -1) return _error('Case not found', 404);
+  const found = _rowToObject(headers, rows[rowIdx]);
+  if (!_canOperateOnCase(found, user)) {
+    _logActivity(user.email, 'BLOCKED_REOPEN_CASE', params.case_id);
+    return _error('Forbidden', 403);
+  }
   const sheetRow = rowIdx + 2;
   const now = new Date().toISOString();
   sheet.getRange(sheetRow, headers.indexOf('status')      + 1).setValue('active');
   sheet.getRange(sheetRow, headers.indexOf('date_closed') + 1).setValue('');
   sheet.getRange(sheetRow, headers.indexOf('updated_at')  + 1).setValue(now);
-  try { CacheService.getScriptCache().remove('case_' + params.case_id + '_' + user.role); } catch(e) {}
+  try { CacheService.getScriptCache().remove(_caseCacheKey('case', params.case_id, user)); } catch(e) {}
   _bustCasesCache(user.email, user.role);
   _bustDashboardCache(user.email, user.role);
   _logActivity(user.email, 'REOPEN_CASE', params.case_id);
@@ -318,7 +406,16 @@ function reopenCase(params, user) {
 
 // ── addService ───────────────────────────────────────────────
 function addService(params, user) {
-  if (user.role === 'cpu_monitor') return _error('Forbidden', 403);
+  if (!_checkPermission('addService', user)) return _error('Forbidden', 403);
+  const caseSheet = _getSheet(CASE_SHEET);
+  const caseData  = caseSheet.getDataRange().getValues();
+  const headers   = caseData[0];
+  const foundRow  = caseData.slice(1).find(r => String(r[headers.indexOf('case_id')]) === String(params.case_id));
+  if (!foundRow) return _error('Case not found', 404);
+  if (!_canOperateOnCase(_rowToObject(headers, foundRow), user)) {
+    _logActivity(user.email, 'BLOCKED_ADD_SERVICE', params.case_id);
+    return _error('Forbidden', 403);
+  }
   const sheet = _getSheet('services');
   const now   = new Date().toISOString();
   sheet.appendRow([
@@ -326,7 +423,7 @@ function addService(params, user) {
     params.case_id, params.service_type || '', params.amount || 0,
     params.date_provided || now, user.email,
   ]);
-  try { CacheService.getScriptCache().remove('case_' + params.case_id + '_' + user.role); } catch(e) {}
+  try { CacheService.getScriptCache().remove(_caseCacheKey('case', params.case_id, user)); } catch(e) {}
   _bustDashboardCache(user.email, user.role);
   _logActivity(user.email, 'ADD_SERVICE', params.case_id);
   return _output({ added: true });
@@ -334,7 +431,16 @@ function addService(params, user) {
 
 // ── addNote ──────────────────────────────────────────────────
 function addNote(params, user) {
-  if (user.role === 'cpu_monitor') return _error('Forbidden', 403);
+  if (!_checkPermission('addNote', user)) return _error('Forbidden', 403);
+  const caseSheet = _getSheet(CASE_SHEET);
+  const caseData  = caseSheet.getDataRange().getValues();
+  const headers   = caseData[0];
+  const foundRow  = caseData.slice(1).find(r => String(r[headers.indexOf('case_id')]) === String(params.case_id));
+  if (!foundRow) return _error('Case not found', 404);
+  if (!_canOperateOnCase(_rowToObject(headers, foundRow), user)) {
+    _logActivity(user.email, 'BLOCKED_ADD_NOTE', params.case_id);
+    return _error('Forbidden', 403);
+  }
   let sheet = _getSheet('progress_notes');
   if (!sheet) {
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -351,14 +457,14 @@ function addNote(params, user) {
     params.content || '', params.action_taken || '', params.next_steps || '',
     user.email, now,
   ]);
-  try { CacheService.getScriptCache().remove('case_' + params.case_id + '_' + user.role); } catch(e) {}
+  try { CacheService.getScriptCache().remove(_caseCacheKey('case', params.case_id, user)); } catch(e) {}
   _logActivity(user.email, 'ADD_NOTE', params.case_id);
   return _output({ added: true });
 }
 
 // ── updateNote ───────────────────────────────────────────────
 function updateNote(params, user) {
-  if (user.role === 'cpu_monitor') return _error('Forbidden', 403);
+  if (!_checkPermission('updateNote', user)) return _error('Forbidden', 403);
   const sheet = _getSheet('progress_notes');
   if (!sheet) return _error('Resource not available', 500);
   const allData = sheet.getDataRange().getValues();
@@ -366,6 +472,16 @@ function updateNote(params, user) {
   const rows    = allData.slice(1);
   const rowIdx  = rows.findIndex(r => String(r[headers.indexOf('note_id')]) === String(params.note_id));
   if (rowIdx === -1) return _error('Note not found', 404);
+  const caseSheet    = _getSheet(CASE_SHEET);
+  const caseData     = caseSheet.getDataRange().getValues();
+  const caseHeaders  = caseData[0];
+  const noteCaseId   = params.case_id || rows[rowIdx][headers.indexOf('case_id')];
+  const foundCaseRow = caseData.slice(1).find(r => String(r[caseHeaders.indexOf('case_id')]) === String(noteCaseId));
+  if (!foundCaseRow) return _error('Case not found', 404);
+  if (!_canOperateOnCase(_rowToObject(caseHeaders, foundCaseRow), user)) {
+    _logActivity(user.email, 'BLOCKED_UPDATE_NOTE', noteCaseId);
+    return _error('Forbidden', 403);
+  }
   const sheetRow = rowIdx + 2;
   ['note_type','date_note','content','action_taken','next_steps'].forEach(f => {
     const colIdx = headers.indexOf(f);
@@ -373,7 +489,8 @@ function updateNote(params, user) {
       sheet.getRange(sheetRow, colIdx + 1).setValue(params[f] || '');
     }
   });
-  try { CacheService.getScriptCache().remove('case_' + params.case_id + '_' + user.role); } catch(e) {}
+  try { CacheService.getScriptCache().remove(_caseCacheKey('case', noteCaseId, user)); } catch(e) {}
+  _logActivity(user.email, 'UPDATE_NOTE', noteCaseId);
   return _output({ updated: true });
 }
 
@@ -407,7 +524,7 @@ function _ensureLocationSheet() {
 
 // ── saveLocation ─────────────────────────────────────────────
 function saveLocation(params, user) {
-  if (!['admin','case_worker','fo_user','lgu_supervisor'].includes(user.role)) {
+  if (!['case_worker','fo_user','lgu_supervisor'].includes(user.role)) {
     return _error('Forbidden', 403);
   }
 
@@ -415,6 +532,10 @@ function saveLocation(params, user) {
   const cases = _sheetToObjectsSS(ss, CASE_SHEET);
   const found = cases.find(c => c.case_id === params.case_id);
   if (!found) return _error('Case not found', 404);
+  if (!_canOperateOnCase(found, user)) {
+    _logActivity(user.email, 'BLOCKED_SAVE_LOCATION', params.case_id);
+    return _error('Forbidden', 403);
+  }
 
   const sheet  = _ensureLocationSheet();
   const now    = new Date().toISOString();
@@ -461,6 +582,16 @@ function getLocations(e, user) {
   const sheet   = _getSheet(LOCATION_SHEET);
   if (!sheet) return _output([]);
 
+  const caseSheet = _getSheet(CASE_SHEET);
+  const caseData  = caseSheet.getDataRange().getValues();
+  const headers   = caseData[0];
+  const foundRow  = caseData.slice(1).find(r => String(r[headers.indexOf('case_id')]) === String(case_id));
+  if (!foundRow) return _error('Case not found', 404);
+  if (!_canViewCase(_rowToObject(headers, foundRow), user)) {
+    _logActivity(user.email, 'BLOCKED_GET_LOCATIONS', case_id);
+    return _error('Forbidden', 403);
+  }
+
   const locations = _sheetToObjects(sheet)
     .filter(l => l.case_id === case_id)
     .sort((a, b) => new Date(b.recorded_at) - new Date(a.recorded_at));
@@ -471,9 +602,19 @@ function getLocations(e, user) {
 // ── getLatestLocation ─────────────────────────────────────────
 function getLatestLocation(e, user) {
   const case_id  = e.parameter.case_id;
-  const cacheKey = 'loc_' + case_id;
+  const cacheKey = _caseCacheKey('loc', case_id, user);
   const cached   = _cacheGet(cacheKey);
   if (cached) return _output(cached);
+
+  const caseSheet = _getSheet(CASE_SHEET);
+  const caseData  = caseSheet.getDataRange().getValues();
+  const headers   = caseData[0];
+  const foundRow  = caseData.slice(1).find(r => String(r[headers.indexOf('case_id')]) === String(case_id));
+  if (!foundRow) return _error('Case not found', 404);
+  if (!_canViewCase(_rowToObject(headers, foundRow), user)) {
+    _logActivity(user.email, 'BLOCKED_GET_LATEST_LOCATION', case_id);
+    return _error('Forbidden', 403);
+  }
 
   const sheet = _getSheet(LOCATION_SHEET);
   if (!sheet) return _output(null);

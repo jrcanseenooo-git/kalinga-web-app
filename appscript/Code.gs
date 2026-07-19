@@ -1,4 +1,4 @@
-const SPREADSHEET_ID = '';
+const SPREADSHEET_ID = '1O9C0eDYsMrpWeCKIMalxT9Xlz1hxXSXS0ZzGmZYDJ3w';
 const ALLOWED_DOMAIN = 'dswd.gov.ph';
 const SESSION_TOKEN_PREFIX = 'ses_';
 const GOOGLE_CERTS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
@@ -153,12 +153,13 @@ function _getAuthedUser(token) {
   const sheet = _getSheet('users');
   const [headers, ...rows] = sheet.getDataRange().getValues();
   const idx = {
-    email:    headers.indexOf('email'),
-    role:     headers.indexOf('role'),
-    active:   headers.indexOf('active'),
-    lgu_code: headers.indexOf('lgu_code'),
-    region:   headers.indexOf('region'),
-    province: headers.indexOf('province'),
+    email:       headers.indexOf('email'),
+    role:        headers.indexOf('role'),
+    active:      headers.indexOf('active'),
+    lgu_code:    headers.indexOf('lgu_code'),
+    region:      headers.indexOf('region'),
+    province:    headers.indexOf('province'),
+    permissions: headers.indexOf('permissions'),
   };
 
   const row = rows.find(r => r[idx.email] === email && r[idx.active] === true);
@@ -166,11 +167,25 @@ function _getAuthedUser(token) {
 
   return {
     email,
-    role:     row[idx.role],
-    lgu_code: row[idx.lgu_code] || '',
-    region:   idx.region   >= 0 ? row[idx.region]   : '',
-    province: idx.province >= 0 ? row[idx.province] : '',
+    role:        row[idx.role],
+    lgu_code:    row[idx.lgu_code] || '',
+    region:      idx.region   >= 0 ? row[idx.region]   : '',
+    province:    idx.province >= 0 ? row[idx.province] : '',
+    permissions: _parsePermissions(idx.permissions >= 0 ? row[idx.permissions] : ''),
   };
+}
+
+// Parse the per-user permissions cell (JSON array of granted actions).
+// Tolerant of empty cells, malformed JSON, and a missing column so the
+// system behaves exactly as before when no grants are configured.
+function _parsePermissions(cell) {
+  if (!cell) return [];
+  try {
+    var parsed = JSON.parse(cell);
+    return Array.isArray(parsed) ? parsed.filter(function (a) { return typeof a === 'string'; }) : [];
+  } catch (e) {
+    return [];
+  }
 }
 
 // ── Role-action permission map ───────────────────────────────
@@ -184,18 +199,39 @@ var ROLE_PERMISSIONS = {
   addService:   ['case_worker', 'fo_user', 'lgu_supervisor'],
   addNote:      ['case_worker', 'fo_user', 'lgu_supervisor'],
   updateNote:   ['case_worker'],
-  saveLocation: ['admin', 'case_worker', 'fo_user', 'lgu_supervisor'],
+  saveLocation: ['case_worker', 'fo_user', 'lgu_supervisor'],
   createUser:   ['admin'],
   updateUser:   ['admin'],
   toggleUser:   ['admin'],
   setPassword:  ['admin'],
+  generateReport: ['admin', 'case_worker', 'fo_user', 'lgu_supervisor', 'cpu_monitor'],
   logExport:    ['admin', 'case_worker', 'fo_user', 'lgu_supervisor', 'cpu_monitor'],
+  // Form builder — admin only, and deliberately NOT grantable.
+  saveFormField:      ['admin'],
+  deleteFormField:    ['admin'],
+  saveLookupOption:   ['admin'],
+  deleteLookupOption: ['admin'],
 };
+
+// Actions an admin may grant to an individual user on top of their role.
+// Grants are additive only — they can add access, never remove it. Admin
+// and user-management actions are intentionally NOT grantable here; those
+// stay role-gated so least privilege can't be widened by accident.
+var GRANTABLE_ACTIONS = [
+  'createCase', 'updateCase', 'closeCase', 'reopenCase',
+  'addService', 'addNote', 'updateNote', 'generateReport',
+];
 
 function _checkPermission(action, user) {
   var allowed = ROLE_PERMISSIONS[action];
   if (!allowed) return true;
-  return allowed.indexOf(user.role) !== -1;
+  if (allowed.indexOf(user.role) !== -1) return true;
+  // Additive per-user grant — only for whitelisted grantable actions.
+  if (GRANTABLE_ACTIONS.indexOf(action) !== -1 &&
+      user.permissions && user.permissions.indexOf(action) !== -1) {
+    return true;
+  }
+  return false;
 }
 
 // ── Router ────────────────────────────────────────────────────
@@ -211,7 +247,11 @@ function doGet(e) {
   if (action === 'getPublicDashboard') return getPublicDashboard(e);
   if (action === 'loginWithPassword') {
     var clientIp = (e.parameter._ip || 'unknown').replace(/[^a-zA-Z0-9.:]/g, '');
-    if (!_checkRateLimit('login_' + clientIp, 5, 60)) {
+    var loginEmail = (params.email || 'unknown').toLowerCase().replace(/[^a-zA-Z0-9.@_-]/g, '');
+    var loginLimiter = clientIp === 'unknown'
+      ? 'login_email_' + loginEmail
+      : 'login_' + clientIp + '_' + loginEmail;
+    if (!_checkRateLimit(loginLimiter, 5, 60)) {
       return _error('Too many requests. Please try again later.', 429);
     }
     return loginWithPassword(params);
@@ -243,11 +283,13 @@ function doGet(e) {
     case 'getCase':           return getCase(e, user);
     case 'getDashboard':      return getDashboard(e, user);
     case 'getLookups':        return getLookups(e, user);
+    case 'getFormFields':     return getFormFields(e, user);
     case 'getMe':             return getMe(params, user, token);
     case 'getUsers':          return getUsers(e, user);
     case 'getLocations':      return getLocations(e, user);
     case 'getLatestLocation': return getLatestLocation(e, user);
     case 'getAuditLogs':      return getAuditLogs(e, user);
+    case 'generateReport':    return generateReport(params, user);
     // Write
     case 'createCase':     return createCase(params, user);
     case 'updateCase':     return updateCase(params, user);
@@ -263,6 +305,11 @@ function doGet(e) {
     case 'setPassword':    return setUserPassword(params, user);
     case 'changePassword': return changePassword(params, user);
     case 'logExport':      return logExport(params, user);
+    // Form builder (admin)
+    case 'saveFormField':      return saveFormField(params, user);
+    case 'deleteFormField':    return deleteFormField(params, user);
+    case 'saveLookupOption':   return saveLookupOption(params, user);
+    case 'deleteLookupOption': return deleteLookupOption(params, user);
     default:               return _error('Unknown action');
   }
 }
@@ -276,11 +323,12 @@ function getMe(params, user, token) {
   // Already using a long-lived session token — just return user info
   if (token && token.startsWith(SESSION_TOKEN_PREFIX)) {
     return _output({
-      email:    user.email,
-      role:     user.role,
-      lgu_code: user.lgu_code,
-      region:   user.region,
-      province: user.province,
+      email:       user.email,
+      role:        user.role,
+      lgu_code:    user.lgu_code,
+      region:      user.region,
+      province:    user.province,
+      permissions: user.permissions || [],
     });
   }
  
@@ -297,6 +345,7 @@ function getMe(params, user, token) {
     lgu_code:      user.lgu_code,
     region:        user.region,
     province:      user.province,
+    permissions:   user.permissions || [],
     session_token: sessionToken,
   });
 }

@@ -412,15 +412,7 @@
                     <label class="block text-xs font-semibold text-gray-500 mb-1.5">Purpose of referral</label>
                     <select v-model="noteForm.referral_purpose" class="input-base text-sm">
                       <option value="">- Select purpose -</option>
-                      <option value="Psychosocial support">Psychosocial support</option>
-                      <option value="Medical assistance">Medical assistance</option>
-                      <option value="Legal assistance">Legal assistance</option>
-                      <option value="Livelihood / skills training">Livelihood / skills training</option>
-                      <option value="Educational assistance">Educational assistance</option>
-                      <option value="Shelter / temporary placement">Shelter / temporary placement</option>
-                      <option value="Financial assistance">Financial assistance</option>
-                      <option value="Law enforcement">Law enforcement referral</option>
-                      <option value="Other">Other</option>
+                      <option v-for="purpose in referralPurposeOptions" :key="purpose" :value="purpose">{{ purpose }}</option>
                     </select>
                   </div>
                 </div>
@@ -595,7 +587,8 @@
             <tbody class="divide-y divide-gray-50">
               <tr v-for="s in caseData._services" :key="s.service_id" class="hover:bg-gray-50 transition-colors">
                 <td class="px-4 py-3 capitalize font-medium">{{ s.service_type }}</td>
-                <td class="px-4 py-3 text-right font-semibold text-brand-700">₱{{ Number(s.amount).toLocaleString() }}
+                <td class="px-4 py-3 text-right font-semibold text-brand-700">
+                  {{ Number(s.amount || 0) > 0 ? `₱${Number(s.amount).toLocaleString()}` : '—' }}
                 </td>
                 <td class="px-4 py-3 text-gray-500 text-xs">{{ fmtDate(s.date_provided) }}</td>
                 <td class="px-4 py-3 text-gray-500 text-xs">{{ s.provided_by }}</td>
@@ -646,7 +639,7 @@
             <label class="block text-xs font-semibold text-gray-600 mb-1.5">{{ svcSpecificLabel }}</label>
             <input v-model="svcForm.specific_detail" class="input-base text-sm" :placeholder="svcSpecificPlaceholder" />
           </div>
-          <FormField label="Amount (₱)" v-model="svcForm.amount" type="number" />
+          <FormField v-if="svcRequiresAmount" label="Amount (₱)" v-model="svcForm.amount" type="number" />
           <FormField label="Date provided" v-model="svcForm.date_provided" type="date" />
           <div class="flex gap-3 pt-2">
             <button @click="confirmService" :disabled="savingSvc" class="btn-primary flex-1 justify-center">
@@ -787,6 +780,11 @@ const detailTabs = [
 const showServiceForm = ref(false)
 const savingSvc = ref(false)
 const svcForm = ref({ service_type: '', amount: '', date_provided: '', specific_detail: '' })
+const svcRequiresAmount = computed(() => svcForm.value.service_type === 'Financial')
+
+watch(() => svcForm.value.service_type, () => {
+  if (!svcRequiresAmount.value) svcForm.value.amount = ''
+})
 
 // ── Progress notes / MDT ─────────────────────────────────────
 const showNoteForm = ref(false)
@@ -811,12 +809,54 @@ const noteForm = ref(emptyNote())
 
 function resetNoteForm() { noteForm.value = emptyNote() }
 
+const REFERRAL_PURPOSES_BY_RECIPIENT = {
+  'Social Worker': ['Case management follow-up', 'Family assessment / home visit', 'Safety planning', 'Shelter / temporary placement', 'Financial assistance'],
+  'Psychosocial Officer': ['Psychosocial support', 'Counseling / crisis intervention', 'Mental health referral', 'Family conference'],
+  'Medical Officer': ['Medical assistance', 'Medical check-up', 'Medico-legal examination', 'Mental health referral', 'Pregnancy / reproductive health care'],
+  'Legal Officer': ['Legal assistance', 'Legal counseling', 'Case conference for legal remedy', 'Court / protection order support'],
+  'Livelihood Officer': ['Livelihood / skills training', 'Employment or skills assessment', 'Family economic support referral'],
+  'Case Manager': ['Case conference', 'Case plan review', 'Closure assessment', 'Referral coordination'],
+  'LGU - SWDO': ['Local case monitoring', 'Family assessment / home visit', 'Shelter / temporary placement', 'Financial assistance', 'Aftercare follow-up'],
+  'PNP - WCPD': ['Law enforcement', 'Safety intervention', 'Blotter / incident recording', 'Investigation support'],
+  'DOH / Hospital': ['Medical assistance', 'Medical check-up', 'Medico-legal examination', 'Pregnancy / reproductive health care', 'Hospitalization'],
+  'DepEd': ['Educational assistance', 'School re-entry', 'ALS enrollment', 'Guidance counseling coordination'],
+  'DSWD Crisis Center': ['Shelter / temporary placement', 'Psychosocial support', 'Case conference', 'Protective custody coordination'],
+  "Public Attorney's Office (PAO)": ['Legal assistance', 'Legal counseling', 'Court representation'],
+  'NCIP (for IP cases)': ['Culturally appropriate intervention', 'IP community coordination', 'Legal assistance'],
+  'NGO Partner': ['Psychosocial support', 'Educational assistance', 'Livelihood / skills training', 'Shelter / temporary placement'],
+  'Other': ['Other'],
+}
+
+const DEFAULT_REFERRAL_PURPOSES = [
+  'Psychosocial support',
+  'Medical assistance',
+  'Legal assistance',
+  'Livelihood / skills training',
+  'Educational assistance',
+  'Shelter / temporary placement',
+  'Financial assistance',
+  'Law enforcement',
+  'Other',
+]
+
+const referralPurposeOptions = computed(() =>
+  REFERRAL_PURPOSES_BY_RECIPIENT[noteForm.value.referred_to] || DEFAULT_REFERRAL_PURPOSES
+)
+
+watch(() => noteForm.value.referred_to, () => {
+  if (noteForm.value.referral_purpose && !referralPurposeOptions.value.includes(noteForm.value.referral_purpose)) {
+    noteForm.value.referral_purpose = ''
+    noteForm.value.specific_detail = ''
+  }
+})
+
 const editingNoteId = ref(null)
 
 function startEditNote(note) {
   editingNoteId.value = note.note_id
   const parts = (note.action_taken || '').split(' - ')
   noteForm.value = {
+    ...emptyNote(),
     note_type: note.note_type || '',
     date_note: String(note.date_note || '').slice(0, 10),
     content: note.content || '',
@@ -922,7 +962,7 @@ async function doSubmitService() {
       service_type: svcForm.value.specific_detail
         ? `${svcForm.value.service_type} - ${svcForm.value.specific_detail}`
         : svcForm.value.service_type,
-      amount:       svcForm.value.amount,
+      amount:       svcRequiresAmount.value ? svcForm.value.amount : 0,
       date_provided: svcForm.value.date_provided,
     })
     caseData.value = await api('getCase', { case_id: route.params.id })

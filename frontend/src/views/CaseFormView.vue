@@ -74,7 +74,7 @@
                 class="w-full text-sm border rounded-lg px-3 py-2 bg-gray-50 text-gray-500" />
             </div>
             <SelectField label="Sex" v-model="form.sex" :options="['Male', 'Female']" required />
-            <SelectField label="Civil status" v-model="form.civil_status" :options="civilStatuses" />
+            <SelectField label="Civil status" v-model="form.civil_status" :options="civilStatusOpts" />
           </div>
 
           <div class="grid grid-cols-4 gap-3">
@@ -100,9 +100,9 @@
               </p>
               <p v-else class="text-xs text-gray-400 mt-1">Format: 09XXXXXXXXX (11 digits)</p> -->
             </div>
-            <SelectField label="Religion" v-model="form.religion" :options="religions" />
-            <SelectField label="IP Category" v-model="form.ip_category" :options="ipCategories" />
-            <SelectField label="Highest Education Attainment" v-model="form.education" :options="educLevels" />
+            <SelectField label="Religion" v-model="form.religion" :options="religionOpts" />
+            <SelectField label="IP Category" v-model="form.ip_category" :options="ipCategoryOpts" />
+            <SelectField label="Highest Education Attainment" v-model="form.education" :options="educationOpts" />
           </div>
         </fieldset>
 
@@ -166,7 +166,7 @@
                 </button>
                 <div v-if="showClassifDropdown" class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
                   <div class="p-2 space-y-0.5 max-h-52 overflow-y-auto">
-                    <label v-for="opt in classificationOptions" :key="opt"
+                    <label v-for="opt in classificationOpts" :key="opt"
                       class="flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-50"
                       :class="form.classification.includes(opt) ? 'bg-brand-50' : ''"
                       @mousedown.stop>
@@ -204,7 +204,7 @@
                 </button>
                 <div v-if="showCircumDropdown" class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
                   <div class="p-2 space-y-0.5 max-h-56 overflow-y-auto">
-                    <label v-for="opt in otherCircumstances" :key="opt"
+                    <label v-for="opt in otherCircumstanceOpts" :key="opt"
                       class="flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-50"
                       :class="form.other_circumstances.includes(opt) ? 'bg-brand-50' : ''"
                       @mousedown.stop>
@@ -230,7 +230,7 @@
 
           <!-- Row 2: Mode of admission + Referred by + Referral date -->
           <div class="grid grid-cols-3 gap-3">
-            <SelectField label="Mode of admission" v-model="form.admission_mode" :options="admissionModes" />
+            <SelectField label="Mode of admission" v-model="form.admission_mode" :options="admissionModeOpts" />
             <FormField label="Referred by (person/org)" v-model="form.referred_by" />
             <FormField label="Referral date" v-model="form.referral_date" type="date" />
           </div>
@@ -404,6 +404,56 @@
           </div>
         </fieldset>
 
+        <!-- ═══ Admin-defined custom fields ═══ -->
+        <fieldset v-for="sec in customSections" :key="sec.section" class="space-y-4 border-t pt-4">
+          <legend class="text-xs font-semibold uppercase tracking-wider text-brand-600">
+            {{ sec.section }}
+          </legend>
+
+          <div v-for="f in sec.fields" :key="f.field_key">
+            <label class="block text-xs font-medium text-gray-600 mb-1">
+              {{ f.label }}
+              <span v-if="f.required" class="text-red-400">*</span>
+              <span v-if="f.sensitivity === 'sensitive'"
+                class="ml-1.5 inline-block align-middle text-[10px] font-semibold uppercase tracking-wide
+                       bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">
+                Sensitive
+              </span>
+            </label>
+            <p v-if="f.help_text" class="text-xs text-gray-400 mb-1">{{ f.help_text }}</p>
+
+            <textarea v-if="f.field_type === 'textarea'" v-model="customValues[f.field_key]"
+              rows="3" class="field resize-none" />
+
+            <select v-else-if="f.field_type === 'select'" v-model="customValues[f.field_key]"
+              class="field">
+              <option value="">- Select -</option>
+              <option v-for="o in f.options" :key="o" :value="o">{{ o }}</option>
+            </select>
+
+            <div v-else-if="f.field_type === 'multiselect'" class="flex flex-wrap gap-2">
+              <label v-for="o in f.options" :key="o"
+                class="flex items-center gap-1.5 text-sm border rounded-lg px-2.5 py-1.5 cursor-pointer hover:bg-gray-50">
+                <input type="checkbox"
+                  :checked="(customValues[f.field_key] || []).includes(o)"
+                  @change="toggleCustomMulti(f.field_key, o)"
+                  class="rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
+                {{ o }}
+              </label>
+            </div>
+
+            <label v-else-if="f.field_type === 'checkbox'" class="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" v-model="customValues[f.field_key]"
+                class="rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
+              Yes
+            </label>
+
+            <input v-else v-model="customValues[f.field_key]"
+              :type="f.field_type === 'number' ? 'number' : f.field_type === 'date' ? 'date' : 'text'"
+              class="field" />
+          </div>
+        </fieldset>
+
         <!-- ═══ Error & Actions ═══ -->
         <div v-if="error" class="flex items-start gap-2 bg-red-50 border border-red-100 px-3.5 py-3 rounded-xl">
           <span class="text-red-500 text-xs mt-0.5">⚠</span>
@@ -487,6 +537,93 @@ const otherCircumstances = [
 
 const showCircumDropdown = ref(false)
 const circumDropdownRef  = ref(null)
+
+// ─── Admin-managed form configuration ─────────────────────────
+// Dropdown options come from the admin-editable `lookups` sheet and custom
+// fields from `form_fields`. Both are cached in localStorage so intake still
+// renders correctly offline (GIDA) and falls back to the bundled defaults if
+// an admin hasn't customised anything yet.
+const lookups      = ref({})
+const customFields = ref([])
+const customValues = ref({})
+
+const LOOKUPS_CACHE = 'cefmu_lookups_cache'
+const FIELDS_CACHE  = 'cefmu_formfields_cache'
+
+function lookupOpts(type, fallback) {
+  const rows = lookups.value?.[type]
+  if (Array.isArray(rows) && rows.length) return rows.map(r => r.label || r.value)
+  return fallback
+}
+
+const civilStatusOpts       = computed(() => lookupOpts('civil_status',      civilStatuses))
+const religionOpts          = computed(() => lookupOpts('religion',          religions))
+const ipCategoryOpts        = computed(() => lookupOpts('ip_category',       ipCategories))
+const educationOpts         = computed(() => lookupOpts('education',         educLevels))
+const admissionModeOpts     = computed(() => lookupOpts('admission_mode',    admissionModes))
+const classificationOpts    = computed(() => lookupOpts('cefmu_type',        classificationOptions))
+const otherCircumstanceOpts = computed(() => lookupOpts('other_circumstance', otherCircumstances))
+
+// Group custom fields into their admin-defined sections
+const customSections = computed(() => {
+  const groups = {}
+  for (const f of customFields.value) {
+    if (!groups[f.section]) groups[f.section] = []
+    groups[f.section].push(f)
+  }
+  return Object.keys(groups).map(section => ({ section, fields: groups[section] }))
+})
+
+function seedCustomDefaults() {
+  for (const f of customFields.value) {
+    if (customValues.value[f.field_key] === undefined) {
+      customValues.value[f.field_key] =
+        f.field_type === 'multiselect' ? [] : f.field_type === 'checkbox' ? false : ''
+    }
+  }
+}
+
+// Clear all custom answers — important when switching to a new intake so one
+// client's answers can never carry over into another's record.
+function resetCustomValues() {
+  customValues.value = {}
+  seedCustomDefaults()
+}
+
+function toggleCustomMulti(key, opt) {
+  const cur = Array.isArray(customValues.value[key]) ? customValues.value[key] : []
+  customValues.value[key] = cur.includes(opt)
+    ? cur.filter(v => v !== opt)
+    : [...cur, opt]
+}
+
+async function loadFormConfig() {
+  // Apply cached config first so the form renders instantly and works offline.
+  try {
+    const l = localStorage.getItem(LOOKUPS_CACHE)
+    if (l) lookups.value = JSON.parse(l)
+    const f = localStorage.getItem(FIELDS_CACHE)
+    if (f) customFields.value = JSON.parse(f)
+  } catch { /* ignore malformed cache */ }
+  seedCustomDefaults()
+
+  try {
+    const [lk, ff] = await Promise.all([api('getLookups'), api('getFormFields')])
+    if (lk && typeof lk === 'object') {
+      lookups.value = lk
+      localStorage.setItem(LOOKUPS_CACHE, JSON.stringify(lk))
+    }
+    if (Array.isArray(ff)) {
+      customFields.value = ff
+      localStorage.setItem(FIELDS_CACHE, JSON.stringify(ff))
+    }
+    seedCustomDefaults()
+  } catch {
+    // Offline — cached configuration is already applied.
+  }
+}
+
+onMounted(loadFormConfig)
 
 // Close dropdown when clicking outside
 onMounted(() => {
@@ -722,6 +859,18 @@ onMounted(async () => {
       }
     })
 
+    // Hydrate admin-defined custom field values
+    try {
+      const cf = data.custom_fields
+      if (cf) {
+        const parsed = typeof cf === 'string' ? JSON.parse(cf) : cf
+        if (parsed && typeof parsed === 'object') {
+          customValues.value = { ...customValues.value, ...parsed }
+        }
+      }
+    } catch { /* ignore malformed custom_fields */ }
+    seedCustomDefaults()
+
     // Prefer _family (from dedicated sheet) over family_members JSON column
     if (data._family && data._family.length) {
       familyMembers.value = data._family.map(m => ({
@@ -753,6 +902,7 @@ onMounted(async () => {
     familyMembers.value = []
     sameAddress.value = false
     error.value = null
+    resetCustomValues()
   }
 })
 
@@ -763,6 +913,7 @@ watch(() => route.path, (path) => {
     familyMembers.value = []
     sameAddress.value = false
     error.value = null
+    resetCustomValues()
   }
 })
 
@@ -810,6 +961,8 @@ async function doSubmit() {
       ...form.value,
       age: computedAge.value,
       family_members: JSON.stringify(familyMembers.value),
+      // Admin-defined custom fields — re-validated and sanitized server-side.
+      custom_fields: JSON.stringify(customValues.value),
     }
     if (isEdit.value) {
       const result = await apiPost('updateCase', { case_id: route.params.id, ...payload })

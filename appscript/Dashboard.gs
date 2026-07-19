@@ -44,31 +44,24 @@ function _bustDashboardCache(userEmail, userRole) {
 
 // ── getDashboard (auth required) ─────────────────────────────
 function getDashboard(e, user) {
-  var cacheKey = "priv_dash_" + user.email;
+  var params = e && e.parameter ? e.parameter : {};
+  var fRegion = params.region || "";
+  var fProvince = params.province || "";
+  var fCity = params.city_muni || "";
+  var cacheKey = "priv_dash_" + user.email + "_" + [fRegion, fProvince, fCity].join("|");
   var cached = _cacheGet(cacheKey);
   if (cached) return _output(cached);
 
   var cases = _sheetToObjects(_getSheet(CASE_SHEET));
   var services = _sheetToObjects(_getSheet("services"));
 
-  var filtered = cases;
-  if (user.role === "case_worker") {
-    filtered = cases.filter(function (c) {
-      return c.case_worker_email === user.email;
-    });
-  } else if (user.role === "fo_user") {
-    filtered = cases.filter(function (c) {
-      return c.region === user.region;
-    });
-  } else if (user.role === "lgu_supervisor") {
-    filtered = cases.filter(function (c) {
-      return c.province === user.province;
-    });
-  } else if (user.role === "cpu_monitor") {
-    filtered = cases.filter(function (c) {
-      return c.lgu_code === user.lgu_code;
-    });
-  }
+  var filtered = cases.filter(function (c) { return _caseVisibleToDashboardUser(c, user); });
+  filtered = filtered.filter(function (c) {
+    if (fRegion && !_sameText(c.region, fRegion)) return false;
+    if (fProvince && !_sameText(c.province, fProvince)) return false;
+    if (fCity && !_sameText(c.city_muni, fCity)) return false;
+    return true;
+  });
 
   var active = filtered.filter(function (c) {
     return c.status === "active";
@@ -92,15 +85,49 @@ function getDashboard(e, user) {
     byCefmuType: _groupCount(filtered, "cefmu_type"),
     bySex: _groupCount(filtered, "sex"),
     ageBands: _buildAgeBands(filtered),
-    byRegion: user.role === "admin" ? _groupCount(filtered, "region") : {},
+    byRegion: _groupCount(filtered, "region"),
+    byProvince: _groupCount(filtered, "province"),
     byLgu:
       user.role !== "case_worker" ? _groupCount(filtered, "city_muni") : {},
+    filters: {
+      region: fRegion,
+      province: fProvince,
+      city_muni: fCity,
+      regions: _groupCount(cases.filter(function (c) { return _caseVisibleToDashboardUser(c, user); }), "region"),
+      provinces: _groupCount(filtered, "province"),
+      cities: _groupCount(filtered, "city_muni"),
+    },
     byService: byService,
     trend: _monthlyTrend(filtered, "date_intake", 6),
   };
 
   _cachePut(cacheKey, result, PRIVATE_CACHE_TTL);
   return _output(result);
+}
+
+function _sameText(a, b) {
+  return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+}
+
+function _hasDashboardCoverageValue(user, key) {
+  return !!String(user && user[key] || "").trim();
+}
+
+function _caseVisibleToDashboardUser(c, user) {
+  if (!user || user.role === "admin") return true;
+  if (user.role === "case_worker") return _sameText(c.case_worker_email, user.email);
+  if (user.role === "fo_user") return _sameText(c.region, user.region);
+  if (user.role === "lgu_supervisor") {
+    if (_hasDashboardCoverageValue(user, "lgu_code")) return _sameText(c.lgu_code, user.lgu_code);
+    if (_hasDashboardCoverageValue(user, "province")) return _sameText(c.province, user.province);
+    return false;
+  }
+  if (user.role === "cpu_monitor") {
+    if (_hasDashboardCoverageValue(user, "lgu_code")) return _sameText(c.lgu_code, user.lgu_code);
+    if (_hasDashboardCoverageValue(user, "province")) return _sameText(c.province, user.province);
+    return false;
+  }
+  return false;
 }
 
 // ── getPublicDashboard (no auth) ─────────────────────────────

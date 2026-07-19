@@ -172,6 +172,27 @@
                 {{ form.role === 'cpu_monitor' ? 'CPU monitor sees all cases from this LGU.' : 'Optional identifier for case worker.' }}
               </p>
             </div>
+
+            <!-- Additional module access (additive grants) -->
+            <div v-if="form.role && form.role !== 'admin'" class="border-t pt-4">
+              <label class="block text-xs font-semibold text-gray-600 mb-1">Additional module access</label>
+              <p class="text-xs text-gray-400 mb-2.5">
+                Grant extra capabilities on top of the role. These only add access — the
+                role's own permissions always remain. (e.g. let a Field Office user do intake.)
+              </p>
+              <div class="space-y-2">
+                <label v-for="m in grantModules" :key="m.label"
+                  class="flex items-start gap-2 cursor-pointer">
+                  <input type="checkbox" :checked="isModuleGranted(m)" @change="toggleModule(m)"
+                    :disabled="isModuleFromRole(m)"
+                    class="mt-0.5 rounded border-gray-300 text-brand-600 focus:ring-brand-500 disabled:opacity-40" />
+                  <span class="text-sm text-gray-700">
+                    {{ m.label }}
+                    <span v-if="isModuleFromRole(m)" class="text-xs text-gray-400">(already in role)</span>
+                  </span>
+                </label>
+              </div>
+            </div>
           </div>
 
           <div v-if="formError" class="mt-4 flex items-start gap-2 bg-red-50 px-3 py-2.5 rounded-xl">
@@ -266,9 +287,60 @@ const settingPwd   = ref(false)
 
 const emptyForm = () => ({
   display_name: '', email: '', role: '',
-  lgu_code: '', region: '', province: ''
+  lgu_code: '', region: '', province: '', permissions: []
 })
 const form = ref(emptyForm())
+
+// Grantable modules → the backend actions they map to. Must stay a subset of
+// the server-side GRANTABLE_ACTIONS whitelist; anything else is dropped on save.
+const grantModules = [
+  { label: 'Case intake (create new cases)', actions: ['createCase'] },
+  { label: 'Edit & close cases',             actions: ['updateCase', 'closeCase', 'reopenCase'] },
+  { label: 'Add services & progress notes',  actions: ['addService', 'addNote'] },
+  { label: 'Edit progress notes',            actions: ['updateNote'] },
+  { label: 'Generate reports',               actions: ['generateReport'] },
+]
+
+// Baseline actions each role already has (mirror of backend ROLE_PERMISSIONS).
+// Used to disable redundant checkboxes so grants only surface *extra* access.
+const ROLE_BASELINE = {
+  admin:          ['generateReport'],
+  case_worker:    ['createCase', 'updateCase', 'closeCase', 'reopenCase', 'addService', 'addNote', 'updateNote', 'generateReport'],
+  fo_user:        ['updateCase', 'closeCase', 'reopenCase', 'addService', 'addNote', 'generateReport'],
+  lgu_supervisor: ['updateCase', 'closeCase', 'reopenCase', 'addService', 'addNote', 'generateReport'],
+  cpu_monitor:    ['generateReport'],
+}
+
+// The users sheet stores permissions as a JSON string; tolerate array,
+// empty, or malformed values.
+function parsePermissions(raw) {
+  if (Array.isArray(raw)) return raw
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function isModuleFromRole(m) {
+  const baseline = ROLE_BASELINE[form.value.role] || []
+  return m.actions.every(a => baseline.includes(a))
+}
+function isModuleGranted(m) {
+  if (isModuleFromRole(m)) return true
+  return m.actions.every(a => form.value.permissions.includes(a))
+}
+function toggleModule(m) {
+  if (isModuleFromRole(m)) return
+  const granted = m.actions.every(a => form.value.permissions.includes(a))
+  if (granted) {
+    form.value.permissions = form.value.permissions.filter(a => !m.actions.includes(a))
+  } else {
+    form.value.permissions = [...new Set([...form.value.permissions, ...m.actions])]
+  }
+}
 
 // All 17 Philippine regions
 const regionOptions = [
@@ -354,6 +426,7 @@ function editUser(u) {
     lgu_code:     u.lgu_code  || '',
     region:       u.region    || '',
     province:     u.province  || '',
+    permissions:  parsePermissions(u.permissions),
   }
   showForm.value = true
 }

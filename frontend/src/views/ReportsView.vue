@@ -354,7 +354,7 @@ async function confirmExport() {
   apiPost('logExport', {
     export_type: pendingExportType.value,
     purpose,
-    record_count: filtered.value.length,
+    exported_count: filtered.value.length,
     filters: JSON.stringify(filters.value),
   }).catch(() => {})
 
@@ -384,9 +384,9 @@ function clearFilters() {
 async function loadCases() {
   loading.value = true
   try {
-    const params = {}
-    if (filters.value.status) params.status = filters.value.status
-    cases.value = await api('getCases', params)
+    cases.value = await api('generateReport', {
+      filters: JSON.stringify(filters.value),
+    }, { skipCache: true })
     generated.value = true
     page.value = 1
   } finally {

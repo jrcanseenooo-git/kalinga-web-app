@@ -1,3 +1,42 @@
+function _matchesReportFilters(c, filters) {
+  filters = filters || {};
+  if (filters.status && String(c.status || '') !== String(filters.status)) return false;
+  if (filters.region && !_sameText(c.region, filters.region)) return false;
+  if (filters.province && !_sameText(c.province, filters.province)) return false;
+  if (filters.classification && !_sameText(c.classification, filters.classification)) return false;
+  if (filters.cefmuType && String(c.cefmu_type || '') !== String(filters.cefmuType)) return false;
+  if (filters.sex && String(c.sex || '') !== String(filters.sex)) return false;
+  if (filters.dateFrom && String(c.date_intake || '') < String(filters.dateFrom)) return false;
+  if (filters.dateTo && String(c.date_intake || '') > String(filters.dateTo)) return false;
+  return true;
+}
+
+function _parseFiltersParam(filters) {
+  if (!filters) return {};
+  if (typeof filters === 'object') return filters;
+  try { return JSON.parse(filters); } catch (e) { return {}; }
+}
+
+function generateReport(params, user) {
+  const filters = _parseFiltersParam(params.filters);
+  let cases = _sheetToObjects(_getSheet(CASE_SHEET));
+  cases = cases
+    .filter(function(c) { return _canViewCase(c, user); })
+    .filter(function(c) { return _matchesReportFilters(c, filters); });
+
+  _logActivity(
+    user.email,
+    'GENERATE_REPORT',
+    JSON.stringify({
+      count: cases.length,
+      scope: { role: user.role, lgu_code: user.lgu_code || '', province: user.province || '', region: user.region || '' },
+      filters: filters,
+    })
+  );
+
+  return _output(cases);
+}
+
 function logExport(params, user) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
 
@@ -17,9 +56,14 @@ function logExport(params, user) {
     sheet.setFrozenRows(1);
   }
 
-  const filters = typeof params.filters === 'object'
-    ? JSON.stringify(params.filters)
-    : String(params.filters || '');
+  const parsedFilters = _parseFiltersParam(params.filters);
+  const visibleCount = _sheetToObjects(_getSheet(CASE_SHEET))
+    .filter(function(c) { return _canViewCase(c, user); })
+    .filter(function(c) { return _matchesReportFilters(c, parsedFilters); })
+    .length;
+  const requestedCount = Number(params.exported_count || params.record_count) || 0;
+  const auditedCount = Math.min(requestedCount, visibleCount);
+  const filters = JSON.stringify(parsedFilters);
 
   sheet.appendRow([
     new Date().toISOString(),
@@ -28,12 +72,21 @@ function logExport(params, user) {
     user.lgu_code || '',
     user.region   || '',
     user.province || '',
-    Number(params.exported_count) || 0,
+    auditedCount,
     filters,
   ]);
 
   // Also write to the main activity_log so it appears in existing logs
-  _logActivity(user.email, 'EXPORT_CSV', `${params.exported_count || 0} records`);
+  _logActivity(
+    user.email,
+    'EXPORT_' + String(params.export_type || 'CSV').toUpperCase(),
+    JSON.stringify({
+      count: auditedCount,
+      requested_count: requestedCount,
+      purpose: params.purpose || '',
+      filters: parsedFilters,
+    })
+  );
 
   return _output({ logged: true });
 }

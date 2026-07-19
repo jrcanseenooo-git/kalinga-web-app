@@ -1,6 +1,11 @@
 import { enqueue } from '@/services/offlineQueue'
+import { demoApi, demoPost } from '@/services/demoData'
 
 const BASE_URL = import.meta.env.VITE_APPS_SCRIPT_URL
+
+function isDemoMode() {
+  return localStorage.getItem('cefmu_demo_screenshots') === '1'
+}
 
 // ── Cache store ──────────────────────────────────────────────
 const _cache = new Map()
@@ -51,6 +56,8 @@ function getToken() {
 }
 
 async function _fetch(action, params = {}) {
+  if (isDemoMode()) return demoApi(action, params)
+
   // Throw a recognisable error when offline so callers can
   // show cached / queued data instead of a generic error banner
   if (!navigator.onLine) throw new Error('OFFLINE')
@@ -129,6 +136,8 @@ export async function api(action, params = {}, options = {}) {
 // storing — the Apps Script backend uses this to deduplicate
 // if the same item is replayed more than once.
 export async function apiPost(action, body = {}) {
+  if (isDemoMode()) return demoPost(action, body)
+
   // ── Offline path: queue and return synthetic response ─────
   if (!navigator.onLine) {
     await enqueue(action, body)

@@ -41,12 +41,15 @@ function loginWithPassword(params) {
     role:                 headers.indexOf('role'),
     active:               headers.indexOf('active'),
     lgu_code:             headers.indexOf('lgu_code'),
+    region:               headers.indexOf('region'),
+    province:             headers.indexOf('province'),
     display_name:         headers.indexOf('display_name'),
     password_hash:        headers.indexOf('password_hash'),
     salt:                 headers.indexOf('salt'),
     must_change_password: headers.indexOf('must_change_password'),
     failed_attempts:      headers.indexOf('failed_attempts'),
     locked_until:         headers.indexOf('locked_until'),
+    permissions:          headers.indexOf('permissions'),
   };
 
   const rowIdx = rows.findIndex(r => r[idx.email] === email);
@@ -96,10 +99,13 @@ function loginWithPassword(params) {
     expires_at:           sessionExpiry,
     must_change_password: row[idx.must_change_password] === true,
     user: {
-      email:    email,
-      name:     row[idx.display_name],
-      role:     row[idx.role],
-      lgu_code: row[idx.lgu_code],
+      email:       email,
+      name:        row[idx.display_name],
+      role:        row[idx.role],
+      lgu_code:    row[idx.lgu_code],
+      region:      idx.region   >= 0 ? row[idx.region]   : '',
+      province:    idx.province >= 0 ? row[idx.province] : '',
+      permissions: _parsePermissions(idx.permissions >= 0 ? row[idx.permissions] : ''),
     }
   });
 }

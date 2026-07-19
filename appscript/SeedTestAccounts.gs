@@ -8,12 +8,14 @@
 function seedTestAccounts() {
   var password = 'Kalinga2026!';
 
+  // DSWD accounts (can also test Google OAuth if real @dswd.gov.ph accounts)
+  // External accounts (email/password login only)
   var accounts = [
-    { email: 'qa.admin@dswd.gov.ph',         display_name: 'QA Admin',          role: 'admin',          lgu_code: '',            region: '',         province: '' },
-    { email: 'qa.caseworker@dswd.gov.ph',     display_name: 'QA Case Worker',    role: 'case_worker',    lgu_code: 'KALINGA-001', region: 'Region 2', province: 'Kalinga' },
-    { email: 'qa.fouser@dswd.gov.ph',         display_name: 'QA FO User',        role: 'fo_user',        lgu_code: 'KALINGA-001', region: 'Region 2', province: 'Kalinga' },
-    { email: 'qa.lgusupervisor@dswd.gov.ph',  display_name: 'QA LGU Supervisor', role: 'lgu_supervisor', lgu_code: 'KALINGA-001', region: 'Region 2', province: 'Kalinga' },
-    { email: 'qa.cpumonitor@dswd.gov.ph',     display_name: 'QA CPU Monitor',    role: 'cpu_monitor',    lgu_code: '',            region: 'Region 2', province: 'Kalinga' },
+    { email: 'qa.admin@dswd.gov.ph',        display_name: 'QA Admin',          role: 'admin',          lgu_code: '',            region: '',         province: '' },
+    { email: 'qa.caseworker@dswd.gov.ph',    display_name: 'QA Case Worker',    role: 'case_worker',    lgu_code: 'KALINGA-001', region: 'Region 2', province: 'Kalinga' },
+    { email: 'qa.fouser@kalinga.local',      display_name: 'QA FO User',        role: 'fo_user',        lgu_code: 'KALINGA-001', region: 'Region 2', province: 'Kalinga' },
+    { email: 'qa.supervisor@kalinga.local',  display_name: 'QA LGU Supervisor', role: 'lgu_supervisor', lgu_code: 'KALINGA-001', region: 'Region 2', province: 'Kalinga' },
+    { email: 'qa.monitor@kalinga.local',     display_name: 'QA CPU Monitor',    role: 'cpu_monitor',    lgu_code: '',            region: 'Region 2', province: 'Kalinga' },
   ];
 
   var sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('users');
@@ -24,6 +26,16 @@ function seedTestAccounts() {
 
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   var emailIdx = headers.indexOf('email');
+  var requiredHeaders = [
+    'email', 'display_name', 'role', 'lgu_code', 'region', 'province',
+    'active', 'created_at', 'password_hash', 'salt', 'must_change_password',
+    'failed_attempts', 'locked_until'
+  ];
+  var missingHeaders = requiredHeaders.filter(function(h) { return headers.indexOf(h) === -1; });
+  if (missingHeaders.length) {
+    Logger.log('ERROR: Missing users sheet columns: ' + missingHeaders.join(', '));
+    return;
+  }
 
   // Check for existing rows to avoid duplicates
   var existingData = sheet.getDataRange().getValues();
@@ -39,21 +51,24 @@ function seedTestAccounts() {
     var salt = Utilities.getUuid().replace(/-/g, '');
     var hash = _sha256Seed(salt + password + salt);
 
-    sheet.appendRow([
-      acct.email,
-      acct.display_name,
-      acct.role,
-      acct.lgu_code,
-      true,                    // active
-      new Date().toISOString(), // created_at
-      acct.region,
-      acct.province,
-      hash,                    // password_hash
-      salt,                    // salt
-      false,                   // must_change_password
-      0,                       // failed_attempts
-      '',                      // locked_until
-    ]);
+    var valuesByHeader = {
+      email: acct.email,
+      display_name: acct.display_name,
+      role: acct.role,
+      lgu_code: acct.lgu_code,
+      region: acct.region,
+      province: acct.province,
+      active: true,
+      created_at: new Date().toISOString(),
+      password_hash: hash,
+      salt: salt,
+      must_change_password: false,
+      failed_attempts: 0,
+      locked_until: '',
+    };
+    sheet.appendRow(headers.map(function(h) {
+      return valuesByHeader.hasOwnProperty(h) ? valuesByHeader[h] : '';
+    }));
     Logger.log('CREATED: ' + acct.email + ' (' + acct.role + ')');
     created++;
   });

@@ -7,6 +7,7 @@ const CasesView = () => import("@/views/CasesView.vue");
 const CaseDetailView = () => import("@/views/CaseDetailView.vue");
 const CaseFormView = () => import("@/views/CaseFormView.vue");
 const UsersView = () => import("@/views/UsersView.vue");
+const FormBuilderView = () => import("@/views/FormBuilderView.vue");
 const PublicDashboardView = () => import("@/views/PublicDashboardView.vue");
 const ReportsView = () => import("@/views/ReportsView.vue");
 const AuditLogsView = () => import("@/views/AuditLogsView.vue");
@@ -38,7 +39,9 @@ const routes = [
     path: "/cases/new",
     name: "case-new",
     component: CaseFormView,
-    meta: { auth: true, roles: ["case_worker"] },
+    // `grant` lets an admin-granted user reach this route even when their
+    // role isn't in `roles` (additive per-user module access).
+    meta: { auth: true, roles: ["case_worker"], grant: "createCase" },
   },
   {
     path: "/cases/:id",
@@ -52,13 +55,20 @@ const routes = [
     component: CaseFormView,
     meta: {
       auth: true,
-      roles: ["admin", "case_worker", "fo_user", "lgu_supervisor"],
+      roles: ["case_worker", "fo_user", "lgu_supervisor"],
+      grant: "updateCase",
     },
   },
   {
     path: "/users",
     name: "users",
     component: UsersView,
+    meta: { auth: true, roles: ["admin"] },
+  },
+  {
+    path: "/form-builder",
+    name: "form-builder",
+    component: FormBuilderView,
     meta: { auth: true, roles: ["admin"] },
   },
   {
@@ -95,14 +105,30 @@ router.beforeEach((to) => {
 
     // If offline but has cached credentials — let them through
     if (cachedToken && cachedUser && !navigator.onLine) {
+      if (to.meta.roles) {
+        try {
+          const offlineUser = JSON.parse(cachedUser)
+          const granted = to.meta.grant &&
+            Array.isArray(offlineUser.permissions) &&
+            offlineUser.permissions.includes(to.meta.grant)
+          if (!to.meta.roles.includes(offlineUser.role) && !granted) {
+            return { name: 'dashboard' }
+          }
+        } catch (e) {
+          return { name: 'login', query: { redirect: to.fullPath } }
+        }
+      }
       return true
     }
 
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 
-  if (to.meta.roles && !to.meta.roles.includes(auth.role))
+  if (to.meta.roles && !to.meta.roles.includes(auth.role)) {
+    // Honor an additive per-user grant before redirecting away.
+    if (to.meta.grant && auth.hasGrant(to.meta.grant)) return true
     return { name: 'dashboard' }
+  }
 
   return true
 });

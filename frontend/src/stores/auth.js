@@ -15,8 +15,22 @@ export const useAuthStore = defineStore("auth", () => {
   const isAdmin = computed(() => role.value === "admin");
   const isCaseWorker = computed(() => role.value === "case_worker");
   const isCpuMonitor = computed(() => role.value === "cpu_monitor");
-  const canEdit = computed(() =>
-    ["admin", "case_worker", "fo_user", "lgu_supervisor"].includes(role.value),
+  const isImplementer = computed(() =>
+    ["case_worker", "fo_user", "lgu_supervisor"].includes(role.value),
+  );
+
+  // Additive per-user grants (mirror of the backend GRANTABLE_ACTIONS check).
+  // These only *add* capability on top of the role — they never remove it.
+  const grants = computed(() => user.value?.permissions || []);
+  const hasGrant = (action) => grants.value.includes(action);
+
+  const canEdit = computed(
+    () =>
+      ["case_worker", "fo_user", "lgu_supervisor"].includes(role.value) ||
+      hasGrant("updateCase"),
+  );
+  const canRegisterCase = computed(
+    () => role.value === "case_worker" || hasGrant("createCase"),
   );
 
   // Google OAuth — raw JWT sent to backend for server-side verification
@@ -42,6 +56,9 @@ export const useAuthStore = defineStore("auth", () => {
         picture: profile.picture,
         role: me.role,
         lgu_code: me.lgu_code,
+        region: me.region,
+        province: me.province,
+        permissions: me.permissions || [],
       };
       localStorage.setItem("cefmu_user", JSON.stringify(user.value));
     } finally {
@@ -58,6 +75,9 @@ export const useAuthStore = defineStore("auth", () => {
       picture: userData.picture || null,
       role: userData.role,
       lgu_code: userData.lgu_code,
+      region: userData.region,
+      province: userData.province,
+      permissions: userData.permissions || [],
     };
     localStorage.setItem("cefmu_token", sessionToken);
     localStorage.setItem("cefmu_user", JSON.stringify(user.value));
@@ -88,7 +108,11 @@ export const useAuthStore = defineStore("auth", () => {
     isAdmin,
     isCaseWorker,
     isCpuMonitor,
+    isImplementer,
+    grants,
+    hasGrant,
     canEdit,
+    canRegisterCase,
     loginWithGoogle,
     loginWithSession,
     logout,

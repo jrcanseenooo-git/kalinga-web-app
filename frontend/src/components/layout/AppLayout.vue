@@ -121,7 +121,7 @@
           </span>
 
           <!-- Quick new case button -->
-          <RouterLink v-if="auth.isCaseWorker" to="/cases/new"
+          <RouterLink v-if="auth.canRegisterCase" to="/cases/new"
             class="btn-primary text-xs py-2 hidden sm:inline-flex">
             <PlusIcon class="w-3.5 h-3.5" />
             New Case
@@ -200,6 +200,7 @@ import {
   ArrowPathIcon,
   WifiIcon,
   ShieldCheckIcon,
+  PencilSquareIcon,
 } from '@heroicons/vue/24/outline'
 
 const auth = useAuthStore()
@@ -226,14 +227,29 @@ function isActive(path) {
 const navItems = computed(() => {
   const items = [
     { to: '/dashboard', label: 'Dashboard', icon: Squares2X2Icon },
-    { to: '/cases', label: 'Case Registry', icon: FolderOpenIcon },
+    { to: '/cases', label: caseModuleLabel.value, icon: FolderOpenIcon },
     { to: '/reports', label: 'Reports', icon: ChartBarIcon },
   ]
+  if (auth.canRegisterCase) {
+    items.splice(2, 0, { to: '/cases/new', label: 'Intake / Registration', icon: PlusCircleIcon })
+  }
   if (auth.isAdmin) {
     items.push({ to: '/users', label: 'User Management', icon: UsersIcon })
+    items.push({ to: '/form-builder', label: 'Form Builder', icon: PencilSquareIcon })
     items.push({ to: '/audit-logs', label: 'Audit Logs', icon: ShieldCheckIcon })
   }
   return items
+})
+
+const caseModuleLabel = computed(() => {
+  const map = {
+    admin: 'Case Monitoring',
+    case_worker: 'Case Management',
+    fo_user: 'Referral Tracking',
+    lgu_supervisor: 'LGU Monitoring',
+    cpu_monitor: 'Monitoring View',
+  }
+  return map[auth.role] || 'Cases'
 })
 
 const pageTitle = computed(() => {
@@ -242,11 +258,12 @@ const pageTitle = computed(() => {
     '/cases': 'Case Registry',
     '/cases/new': 'New Case',
     '/users': 'User Management',
+    '/form-builder': 'Form Builder',
     '/reports': 'Reports & Export',
     '/audit-logs': 'Audit Logs',
     '/faq': 'Help & FAQ',
   }
-  if (route.path.includes('/cases/') && route.path.includes('/edit')) return 'Edit Case'
+  if (route.path.includes('/cases/') && route.path.includes('/edit')) return 'Update Case'
   if (route.path.includes('/cases/') && !route.path.includes('/new')) return 'Case Details'
   return map[route.path] || 'CEFMU Registry'
 })

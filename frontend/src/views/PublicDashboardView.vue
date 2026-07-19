@@ -265,6 +265,7 @@ import {
   ArcElement, Tooltip, Legend
 } from 'chart.js'
 import { api } from '@/services/api'
+import { demoApi } from '@/services/demoData'
 import PhilippineHeatmap from '@/components/ui/PhilippineHeatmap.vue'
 import {
   InformationCircleIcon, XMarkIcon, ChevronDownIcon,
@@ -325,17 +326,24 @@ async function loadData(params = {}, opts = {}) {
   try {
     const data = await api('getPublicDashboard', params, opts)
     if (data) {
-      stats.value = data
-      lastUpdatedAt.value = Date.now()
-      // Preserve the full CEFMU type list from the unfiltered response
-      if (data.allCefmuTypes) {
-        allCefmuTypes.value = Object.keys(data.allCefmuTypes).filter(k => k && k !== 'Unknown')
-      } else if (!allCefmuTypes.value.length) {
-        allCefmuTypes.value = Object.keys(data.byCefmuType || {}).filter(k => k && k !== 'Unknown')
-      }
+      applyDashboardData(data)
     }
   } catch (e) {
-    console.error('Public dashboard load error:', e)
+    if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+      applyDashboardData(demoApi('getPublicDashboard', params))
+    } else {
+      console.error('Public dashboard load error:', e)
+    }
+  }
+}
+
+function applyDashboardData(data) {
+  stats.value = data
+  lastUpdatedAt.value = Date.now()
+  if (data.allCefmuTypes) {
+    allCefmuTypes.value = Object.keys(data.allCefmuTypes).filter(k => k && k !== 'Unknown')
+  } else if (!allCefmuTypes.value.length) {
+    allCefmuTypes.value = Object.keys(data.byCefmuType || {}).filter(k => k && k !== 'Unknown')
   }
 }
 

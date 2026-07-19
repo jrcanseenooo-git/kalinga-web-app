@@ -264,10 +264,10 @@
               <!-- Action -->
               <td class="px-5 py-3.5">
                 <div class="flex items-center justify-end gap-2">
-                  <RouterLink v-if="auth.isAdmin || auth.isCaseWorker" :to="`/cases/${c.case_id}/edit`"
+                  <RouterLink v-if="auth.canEdit" :to="`/cases/${c.case_id}/edit`"
                     class="text-xs text-brand-600 font-semibold hover:text-brand-800 opacity-0 group-hover:opacity-100 transition-all border border-brand-200 hover:border-brand-400 px-2.5 py-1 rounded-lg"
                     @click.stop>
-                    Edit
+                    Update
                   </RouterLink>
                   <ChevronRightIcon class="w-4 h-4 text-gray-300 group-hover:text-brand-400 transition-colors" />
                 </div>
@@ -304,7 +304,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { isOnline, syncedAt } from '@/composables/useSync'
 import { useAuthStore } from '@/stores/auth'
-import { api, invalidateCache } from '@/services/api'
+import { api, apiPost, invalidateCache } from '@/services/api'
 import { getPendingActions } from '@/services/offlineQueue'
 import {
   MagnifyingGlassIcon, FolderOpenIcon, ChevronRightIcon,
@@ -520,9 +520,9 @@ async function exportCSV() {
     await apiPost('logExport', {
       exported_count: filtered.value.length,
       filters: {
-        status: statusFilter.value,
-        cefmu_type: typeFilter.value,
-        sex: sexFilter.value,
+        status: filterStatus.value,
+        cefmu_type: filterClass.value,
+        sex: filterSex.value,
         search: search.value,
       },
     })
