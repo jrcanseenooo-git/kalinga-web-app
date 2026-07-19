@@ -47,7 +47,10 @@ export default defineConfig({
       'X-Content-Type-Options': 'nosniff',
       'Referrer-Policy': 'strict-origin-when-cross-origin',
       'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-      'Content-Security-Policy': "default-src 'self'; script-src 'self' https://accounts.google.com https://apis.google.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com https://unpkg.com; img-src 'self' data: https://*.googleusercontent.com https://*.tile.openstreetmap.org https://server.arcgisonline.com https://*.tile.opentopomap.org; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://raw.githubusercontent.com https://nominatim.openstreetmap.org; frame-src https://accounts.google.com; font-src 'self' https://fonts.gstatic.com",
+      // Keep this in sync with the production CSP in vercel.json. They drifted
+      // once and production silently blocked fonts, the Google Sign-In button
+      // styles, Leaflet, the map tiles and script.googleusercontent.com.
+      'Content-Security-Policy': "default-src 'self'; script-src 'self' https://accounts.google.com https://apis.google.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com https://unpkg.com; img-src 'self' data: blob: https://*.googleusercontent.com https://*.tile.openstreetmap.org https://*.tile.opentopomap.org https://server.arcgisonline.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://raw.githubusercontent.com https://nominatim.openstreetmap.org; frame-src https://accounts.google.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'",
     }
   },
   resolve: {
