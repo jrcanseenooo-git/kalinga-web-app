@@ -92,8 +92,32 @@ function setupV2() {
     ['admission_mode', 'online',    'Online',     4],
     ['admission_mode', 'phone',     'Phone',      5],
   ];
-  newSeeds.forEach(row => lookupSheet.appendRow(row));
-  Logger.log('Added new lookup seeds');
+  // Skip anything already present. Without this guard every re-run appended
+  // another full copy of these seeds, which is how the intake dropdowns ended
+  // up showing each option four times.
+  const existingLookups = {};
+  const lookupData = lookupSheet.getDataRange().getValues();
+  const lHeaders = lookupData[0];
+  const ltCol = lHeaders.indexOf('lookup_type');
+  const lvCol = lHeaders.indexOf('value');
+  const llCol = lHeaders.indexOf('label');
+  for (let i = 1; i < lookupData.length; i++) {
+    existingLookups[String(lookupData[i][ltCol]) + '||' + String(lookupData[i][lvCol])] = true;
+    // Also key on label so a differently-cased value can't create a visual duplicate.
+    existingLookups[String(lookupData[i][ltCol]) + '||L||' + String(lookupData[i][llCol]).toLowerCase()] = true;
+  }
+
+  let addedSeeds = 0;
+  newSeeds.forEach(row => {
+    const byValue = row[0] + '||' + row[1];
+    const byLabel = row[0] + '||L||' + String(row[2]).toLowerCase();
+    if (existingLookups[byValue] || existingLookups[byLabel]) return;
+    lookupSheet.appendRow(row);
+    existingLookups[byValue] = true;
+    existingLookups[byLabel] = true;
+    addedSeeds++;
+  });
+  Logger.log('Added ' + addedSeeds + ' new lookup seeds (skipped ' + (newSeeds.length - addedSeeds) + ' existing)');
 
   Logger.log('SetupV2 complete! Next steps:');
   Logger.log('1. Rename "cases" to "cases_old"');

@@ -177,6 +177,12 @@ export async function apiPost(action, body = {}) {
     createUser:  ['getUsers'],
     updateUser:  ['getUsers'],
     toggleUser:  ['getUsers'],
+    // Form builder — without these the admin edits an option and keeps
+    // seeing the stale 30-minute cached list.
+    saveLookupOption:   ['getLookups'],
+    deleteLookupOption: ['getLookups'],
+    saveFormField:      ['getFormFields'],
+    deleteFormField:    ['getFormFields'],
   }
   ;(invalidations[action] || []).forEach(invalidateCache)
 

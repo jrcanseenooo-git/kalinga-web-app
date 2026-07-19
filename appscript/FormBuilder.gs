@@ -113,6 +113,65 @@ function seedFormLookups() {
   Logger.log('Seeded ' + seeds.length + ' lookup options.');
 }
 
+// ── Remove duplicate dropdown options ────────────────────────
+// Two seeders collided: SetupV2.gs seeds admission_mode/cefmu_type/note_type
+// with snake_case values ('walk_in'), seedFormLookups() seeded Title-Case
+// values ('Walk-in'). Same label, different value, so neither deduped the
+// other — and SetupV2 appends with no guard, so each re-run added a full copy.
+// The admin UI shows the label, so they render as identical repeated chips.
+//
+// Dedupes on (lookup_type + label), keeping the FIRST occurrence. Stored case
+// data is untouched — this only changes what the dropdowns offer.
+//
+// SAFE BY DEFAULT: running this from the editor's Run button only PREVIEWS.
+// Call dedupeLookupsApply() to actually delete.
+function dedupeLookups(apply) {
+  _dedupeLookups(apply === true);
+}
+
+// Explicit destructive entry point — deletes the duplicate rows.
+function dedupeLookupsApply() {
+  _dedupeLookups(true);
+}
+
+function _dedupeLookups(apply) {
+  var dryRun = !apply;
+  var sheet = _getSheet('lookups');
+  if (!sheet) { Logger.log('lookups sheet not found'); return; }
+
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var tCol = headers.indexOf('lookup_type');
+  var vCol = headers.indexOf('value');
+  var lCol = headers.indexOf('label');
+
+  var seen = {};
+  var toDelete = [];
+  for (var i = 1; i < data.length; i++) {
+    var type = String(data[i][tCol]).trim();
+    if (!type) continue;
+    var label = String(data[i][lCol] || data[i][vCol]).trim().toLowerCase();
+    var key = type + '||' + label;
+    if (seen[key]) {
+      toDelete.push({ row: i + 1, type: type, value: data[i][vCol], label: data[i][lCol] });
+    } else {
+      seen[key] = true;
+    }
+  }
+
+  Logger.log((dryRun ? '[DRY RUN] ' : '') + 'Duplicate options found: ' + toDelete.length);
+  toDelete.forEach(function (d) {
+    Logger.log('  row ' + d.row + ': ' + d.type + ' | value="' + d.value + '" label="' + d.label + '"');
+  });
+
+  if (dryRun) { Logger.log('Nothing deleted. Run dedupeLookupsApply() to actually remove these.'); return; }
+
+  // Delete bottom-up so earlier row indexes stay valid.
+  for (var j = toDelete.length - 1; j >= 0; j--) sheet.deleteRow(toDelete[j].row);
+  _bustLookupsCache();
+  Logger.log('Removed ' + toDelete.length + ' duplicate option(s). Unique remaining: ' + Object.keys(seen).length);
+}
+
 function _bustLookupsCache() {
   try { CacheService.getScriptCache().remove('lookups_v1'); } catch (e) {}
 }
@@ -285,11 +344,15 @@ function saveLookupOption(params, user) {
   });
 
   if (rowIdx === -1) {
+    // Sort order must be relative to this lookup_type, not the whole sheet —
+    // using the sheet row count produced values like 118 for a new option.
+    var sameType = rows.filter(function (r) { return String(r[tCol]) === type; });
+    var nextOrder = parseInt(params.sort_order) || (sameType.length + 1);
     sheet.appendRow(headers.map(function (h) {
       if (h === 'lookup_type') return type;
       if (h === 'value') return value;
       if (h === 'label') return label;
-      if (h === 'sort_order') return parseInt(params.sort_order) || rows.length + 1;
+      if (h === 'sort_order') return nextOrder;
       return '';
     }));
     _logActivity(user.email, 'CREATE_LOOKUP', type + ':' + value);
